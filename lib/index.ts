@@ -7,7 +7,11 @@ export type Progress = {
 export type ProgressCallback = (progress: Progress) => void;
 
 export const mv = (sourceFile: string, destFile: string, callback?: ProgressCallback): number => {
-    return MoveFile.mv(sourceFile, destFile, callback);
+    if (callback) {
+        return MoveFile.mv(sourceFile, destFile, callback);
+    } else {
+        return MoveFile.mv(sourceFile, destFile);
+    }
 };
 
 export const mvSync = (sourceFile: string, destFile: string): number => {

@@ -7,8 +7,8 @@ use neon::{
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Mutex};
 
-pub fn mv(mut cx: FunctionContext) -> JsResult<JsNumber> {
-    if cx.argument::<JsFunction>(2).is_ok() {
+pub fn mv(cx: FunctionContext) -> JsResult<JsNumber> {
+    if cx.len() > 2 {
         listen_mv(cx)
     } else {
         spawn_mv(cx)

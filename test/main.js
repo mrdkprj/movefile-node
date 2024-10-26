@@ -65,11 +65,13 @@ var handleSetTitle = function (_e, s, d) { return __awaiter(void 0, void 0, void
         console.log("from");
         if (fs_1.default.existsSync(s)) {
             console.log(s);
-            id = sync ? (0, index_1.mvSync)(s, d) : (0, index_1.mv)(s, d, progressCb);
+            // id = sync ? mvSync(s, d) : mv(s, d, progressCb);
+            id = sync ? (0, index_1.mvSync)(s, d) : (0, index_1.mv)(s, d);
         }
         else {
             console.log(d);
-            id = sync ? (0, index_1.mvSync)(d, s) : (0, index_1.mv)(d, s, progressCb);
+            // id = sync ? mvSync(d, s) : mv(d, s, progressCb);
+            id = sync ? (0, index_1.mvSync)(d, s) : (0, index_1.mv)(d, s);
         }
         console.log(id);
         return [2 /*return*/];

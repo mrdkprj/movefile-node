@@ -30,9 +30,11 @@ const handleSetTitle = async (_e: any, s: string, d: string) => {
     if (fs.existsSync(s)) {
         console.log(s);
         id = sync ? mvSync(s, d) : mv(s, d, progressCb);
+        // id = sync ? mvSync(s, d) : mv(s, d);
     } else {
         console.log(d);
         id = sync ? mvSync(d, s) : mv(d, s, progressCb);
+        // id = sync ? mvSync(d, s) : mv(d, s);
     }
     console.log(id);
     // cancel(id);
