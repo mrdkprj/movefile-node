@@ -49,7 +49,7 @@ const handleSetTitle = async (_e: any, s: string, d: string) => {
 let count = 0;
 const progressCb = (progress: Progress) => {
     count++;
-
+    console.log(progress);
     // if (count > 3) {
     //     cancel(id);
     // }

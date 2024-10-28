@@ -5,8 +5,15 @@ use neon::{
     types::{JsBoolean, JsFunction, JsNumber, JsPromise, JsString},
 };
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Mutex,
+    },
+};
 
+static UUID: AtomicU32 = AtomicU32::new(0);
 static CALLBACKS: Lazy<Mutex<HashMap<u32, neon::handle::Root<JsFunction>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn reserve(mut cx: FunctionContext) -> JsResult<JsNumber> {
@@ -64,10 +71,9 @@ fn listen_mv(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
 
-    if let Some(id) = id {
-        let mut callbacks = CALLBACKS.lock().unwrap();
-        callbacks.insert(id, callback);
-    }
+    let callback_id = UUID.fetch_add(1, Ordering::Relaxed);
+    let mut callbacks = CALLBACKS.lock().unwrap();
+    callbacks.insert(callback_id, callback);
 
     async_std::task::spawn(async move {
         let result = movefile::mv_with_progress(
@@ -91,12 +97,10 @@ fn listen_mv(mut cx: FunctionContext) -> JsResult<JsPromise> {
                     let this = cx.undefined();
                     let args = vec![obj.upcast()];
                     if let Ok(mut callbacks) = CALLBACKS.try_lock() {
-                        if let Some(id) = id {
-                            if let Some(callback) = callbacks.get(&id) {
-                                callback.clone(&mut cx).into_inner(&mut cx).call(&mut cx, this, args).unwrap();
-                                if a == b {
-                                    let _ = callbacks.remove(&id);
-                                }
+                        if let Some(callback) = callbacks.get(&callback_id) {
+                            callback.clone(&mut cx).into_inner(&mut cx).call(&mut cx, this, args).unwrap();
+                            if a == b {
+                                let _ = callbacks.remove(&callback_id);
                             }
                         }
                     }
