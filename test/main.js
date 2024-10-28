@@ -60,21 +60,50 @@ var createWindow = function () {
     win.loadFile("index.html");
 };
 var handleSetTitle = function (_e, s, d) { return __awaiter(void 0, void 0, void 0, function () {
-    return __generator(this, function (_a) {
-        count = 0;
-        console.log("from");
-        if (fs_1.default.existsSync(s)) {
-            console.log(s);
-            // id = sync ? mvSync(s, d) : mv(s, d, progressCb);
-            id = sync ? (0, index_1.mvSync)(s, d) : (0, index_1.mv)(s, d);
+    var _a, _b, ex_1;
+    return __generator(this, function (_c) {
+        switch (_c.label) {
+            case 0:
+                count = 0;
+                console.log("from");
+                _c.label = 1;
+            case 1:
+                _c.trys.push([1, 10, , 11]);
+                if (!fs_1.default.existsSync(s)) return [3 /*break*/, 5];
+                console.log(s);
+                if (!sync) return [3 /*break*/, 2];
+                _a = (0, index_1.mvSync)(s, d);
+                return [3 /*break*/, 4];
+            case 2: return [4 /*yield*/, (0, index_1.mv)(s, d, progressCb)];
+            case 3:
+                _a = _c.sent();
+                _c.label = 4;
+            case 4:
+                _a;
+                return [3 /*break*/, 9];
+            case 5:
+                console.log(d);
+                if (!sync) return [3 /*break*/, 6];
+                _b = (0, index_1.mvSync)(d, s);
+                return [3 /*break*/, 8];
+            case 6: return [4 /*yield*/, (0, index_1.mv)(d, s, progressCb)];
+            case 7:
+                _b = _c.sent();
+                _c.label = 8;
+            case 8:
+                _b;
+                _c.label = 9;
+            case 9:
+                console.log(id);
+                return [3 /*break*/, 11];
+            case 10:
+                ex_1 = _c.sent();
+                console.log("error");
+                console.log(ex_1);
+                electron_1.dialog.showErrorBox("e", ex_1.message);
+                return [3 /*break*/, 11];
+            case 11: return [2 /*return*/];
         }
-        else {
-            console.log(d);
-            // id = sync ? mvSync(d, s) : mv(d, s, progressCb);
-            id = sync ? (0, index_1.mvSync)(d, s) : (0, index_1.mv)(d, s);
-        }
-        console.log(id);
-        return [2 /*return*/];
     });
 }); };
 var count = 0;

@@ -8,7 +8,7 @@ use std::{
     },
 };
 use windows::{
-    core::{Result, HRESULT, PCWSTR},
+    core::{HRESULT, PCWSTR},
     Win32::{
         Foundation::HANDLE,
         Storage::FileSystem::{MoveFileWithProgressW, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH},
@@ -20,7 +20,7 @@ static CANCEL_TOKEN: Lazy<Mutex<HashMap<u32, u32>>> = Lazy::new(|| Mutex::new(Ha
 const PROGRESS_CANCEL: u32 = 1;
 
 struct ProgressData<'a> {
-    id: u32,
+    id: Option<u32>,
     callback: Option<&'a mut dyn FnMut(i64, i64)>,
 }
 
@@ -33,15 +33,15 @@ pub(crate) fn reserve() -> u32 {
     id
 }
 
-pub(crate) fn mv(id: u32, source_file: String, dest_file: String) -> Result<()> {
-    cancellable_move(id, source_file, dest_file, None)
+pub(crate) fn mv(source_file: String, dest_file: String, id: Option<u32>) -> Result<(), String> {
+    cancellable_move(source_file, dest_file, None, id)
 }
 
-pub(crate) fn mv_with_progress(id: u32, source_file: String, dest_file: String, handler: &mut dyn FnMut(i64, i64)) -> Result<()> {
-    cancellable_move(id, source_file, dest_file, Some(handler))
+pub(crate) fn mv_with_progress(source_file: String, dest_file: String, handler: &mut dyn FnMut(i64, i64), id: Option<u32>) -> Result<(), String> {
+    cancellable_move(source_file, dest_file, Some(handler), id)
 }
 
-fn cancellable_move(id: u32, source_file: String, dest_file: String, handler: Option<&mut dyn FnMut(i64, i64)>) -> Result<()> {
+fn cancellable_move(source_file: String, dest_file: String, handler: Option<&mut dyn FnMut(i64, i64)>, id: Option<u32>) -> Result<(), String> {
     let data = Box::into_raw(Box::new(ProgressData {
         id,
         callback: handler,
@@ -51,7 +51,7 @@ fn cancellable_move(id: u32, source_file: String, dest_file: String, handler: Op
         Ok(_) => {}
         Err(e) => {
             if e.code() != HRESULT::from_win32(1235) {
-                panic!("{}", e.message());
+                return Err(e.message());
             }
         }
     }
@@ -59,10 +59,11 @@ fn cancellable_move(id: u32, source_file: String, dest_file: String, handler: Op
     Ok(())
 }
 
-pub(crate) fn mv_sync(source_file: String, dest_file: String) -> Result<bool> {
-    unsafe { MoveFileWithProgressW(to_file_path(source_file), to_file_path(dest_file), None, None, MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) }?;
-
-    Ok(true)
+pub(crate) fn mv_sync(source_file: String, dest_file: String) -> Result<bool, String> {
+    match unsafe { MoveFileWithProgressW(to_file_path(source_file), to_file_path(dest_file), None, None, MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) } {
+        Ok(_) => Ok(true),
+        Err(e) => Err(e.message()),
+    }
 }
 
 fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
@@ -91,18 +92,19 @@ unsafe extern "system" fn progress(
         callback(totalfilesize, totalbytestransferred);
     }
 
-    let id = data.id;
-
-    if let Ok(mut tokens) = CANCEL_TOKEN.try_lock() {
-        if let Some(token) = tokens.get(&id) {
-            if *token != 0 {
-                let token = tokens.remove(&id).unwrap();
-                return token;
-            } else {
-                return *token;
+    if let Some(id) = data.id {
+        if let Ok(mut tokens) = CANCEL_TOKEN.try_lock() {
+            if let Some(token) = tokens.get(&id) {
+                if *token != 0 {
+                    let token = tokens.remove(&id).unwrap();
+                    return token;
+                } else {
+                    return *token;
+                }
             }
         }
     }
+
     0
 }
 

@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain, nativeTheme } from "electron";
+import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 
 import path from "path";
 import fs from "fs";
@@ -27,16 +27,23 @@ const createWindow = () => {
 const handleSetTitle = async (_e: any, s: string, d: string) => {
     count = 0;
     console.log("from");
-    if (fs.existsSync(s)) {
-        console.log(s);
-        id = sync ? mvSync(s, d) : mv(s, d, progressCb);
-        // id = sync ? mvSync(s, d) : mv(s, d);
-    } else {
-        console.log(d);
-        id = sync ? mvSync(d, s) : mv(d, s, progressCb);
-        // id = sync ? mvSync(d, s) : mv(d, s);
+    try {
+        if (fs.existsSync(s)) {
+            console.log(s);
+            sync ? mvSync(s, d) : await mv(s, d, progressCb);
+            // sync ? mvSync(s, d) : await mv(s, d);
+        } else {
+            console.log(d);
+            sync ? mvSync(d, s) : await mv(d, s, progressCb);
+            // sync ? mvSync(d, s) : await mv(d, s);
+        }
+        console.log(id);
+    } catch (ex: any) {
+        console.log("error");
+        console.log(ex);
+
+        dialog.showErrorBox("e", ex.message);
     }
-    console.log(id);
     // cancel(id);
 };
 let count = 0;

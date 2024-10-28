@@ -13,6 +13,7 @@ crate-type = ["cdylib"]
 [dependencies]
 movefile = "0.1.0"
 once_cell = "1.19.0"
+async-std = "1.13.0"
 
 [dependencies.neon]
 version = "1"
