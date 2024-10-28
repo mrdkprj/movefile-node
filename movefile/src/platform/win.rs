@@ -60,10 +60,10 @@ fn cancellable_move(source_file: String, dest_file: String, handler: Option<&mut
 }
 
 pub(crate) fn mv_sync(source_file: String, dest_file: String) -> Result<bool, String> {
-    match unsafe { MoveFileWithProgressW(to_file_path(source_file), to_file_path(dest_file), None, None, MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) } {
-        Ok(_) => Ok(true),
-        Err(e) => Err(e.message()),
-    }
+    unsafe { MoveFileWithProgressW(to_file_path(source_file), to_file_path(dest_file), None, None, MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) }
+        .or_else(|e| Err(e.message()))?;
+
+    Ok(true)
 }
 
 fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
