@@ -1,6 +1,5 @@
 use gio::{
     ffi::{G_FILE_COPY_ALL_METADATA, G_FILE_COPY_OVERWRITE},
-    glib,
     prelude::{CancellableExt, FileExt},
     Cancellable,
 };
@@ -26,38 +25,44 @@ pub(crate) fn reserve() -> u32 {
     id
 }
 
-pub(crate) fn mv(id: u32, source_file: String, dest_file: String) -> Result<(), glib::Error> {
-    cancellable_move(id, source_file, dest_file, None)
+pub(crate) fn mv(source_file: String, dest_file: String, id: Option<u32>) -> Result<(), String> {
+    cancellable_move(source_file, dest_file, None, id)
 }
 
-pub(crate) fn mv_with_progress(id: u32, source_file: String, dest_file: String, handler: &mut dyn FnMut(i64, i64)) -> Result<(), glib::Error> {
-    cancellable_move(id, source_file, dest_file, Some(handler))
+pub(crate) fn mv_with_progress(source_file: String, dest_file: String, handler: &mut dyn FnMut(i64, i64), id: Option<u32>) -> Result<(), String> {
+    cancellable_move(source_file, dest_file, Some(handler), id)
 }
 
-fn cancellable_move(id: u32, source_file: String, dest_file: String, handler: Option<&mut dyn FnMut(i64, i64)>) -> Result<(), glib::Error> {
+fn cancellable_move(source_file: String, dest_file: String, handler: Option<&mut dyn FnMut(i64, i64)>, id: Option<u32>) -> Result<(), String> {
     let source = gio::File::for_parse_name(&source_file);
     let dest = gio::File::for_parse_name(&dest_file);
 
-    let token = {
-        let tokens = CANCELABLES.lock().unwrap();
-        tokens.get(&id).unwrap().clone()
+    let cancellable_token = if let Some(id) = id {
+        {
+            let tokens = CANCELABLES.lock().unwrap();
+            tokens.get(&id).unwrap().clone()
+        }
+    } else {
+        Cancellable::new()
     };
 
-    match source.copy(&dest, gio::FileCopyFlags::from_bits(G_FILE_COPY_OVERWRITE | G_FILE_COPY_ALL_METADATA).unwrap(), Some(&token), handler) {
+    match source.copy(&dest, gio::FileCopyFlags::from_bits(G_FILE_COPY_OVERWRITE | G_FILE_COPY_ALL_METADATA).unwrap(), Some(&cancellable_token), handler) {
         Ok(_) => {
-            source.delete(Cancellable::NONE)?;
+            source.delete(Cancellable::NONE).or_else(|e| Err(e.message().to_string()))?;
             if let Ok(mut tokens) = CANCELABLES.try_lock() {
-                if tokens.get(&id).is_some() {
-                    tokens.remove(&id);
+                if let Some(id) = id {
+                    if tokens.get(&id).is_some() {
+                        tokens.remove(&id);
+                    }
                 }
             }
         }
         Err(e) => {
             if dest.query_exists(Cancellable::NONE) {
-                dest.delete(Cancellable::NONE)?
+                dest.delete(Cancellable::NONE).or_else(|e| Err(e.message().to_string()))?;
             }
             if !e.matches(gio::IOErrorEnum::Cancelled) {
-                panic!("{}", e.message());
+                return Err(e.message().to_string());
             }
         }
     }
@@ -65,11 +70,11 @@ fn cancellable_move(id: u32, source_file: String, dest_file: String, handler: Op
     Ok(())
 }
 
-pub(crate) fn mv_sync(source_file: String, dest_file: String) -> Result<bool, glib::Error> {
+pub(crate) fn mv_sync(source_file: String, dest_file: String) -> Result<bool, String> {
     let source = gio::File::for_parse_name(&source_file);
     let dest = gio::File::for_parse_name(&dest_file);
 
-    source.move_(&dest, gio::FileCopyFlags::from_bits(G_FILE_COPY_OVERWRITE | G_FILE_COPY_ALL_METADATA).unwrap(), Cancellable::NONE, None)?;
+    source.move_(&dest, gio::FileCopyFlags::from_bits(G_FILE_COPY_OVERWRITE | G_FILE_COPY_ALL_METADATA).unwrap(), Cancellable::NONE, None).or_else(|e| Err(e.message().to_string()))?;
 
     Ok(true)
 }
