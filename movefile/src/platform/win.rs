@@ -8,16 +8,17 @@ use std::{
     },
 };
 use windows::{
-    core::{HRESULT, PCWSTR},
+    core::{Error, HRESULT, PCWSTR},
     Win32::{
         Foundation::HANDLE,
-        Storage::FileSystem::{MoveFileWithProgressW, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH},
+        Storage::FileSystem::{DeleteFileW, GetFileAttributesW, MoveFileWithProgressW, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH},
     },
 };
 
 static UUID: AtomicU32 = AtomicU32::new(0);
 static CANCEL_TOKEN: Lazy<Mutex<HashMap<u32, u32>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 const PROGRESS_CANCEL: u32 = 1;
+const FILE_NO_EXISTS: u32 = 4294967295;
 
 struct ProgressData<'a> {
     id: Option<u32>,
@@ -47,27 +48,59 @@ fn cancellable_move(source_file: String, dest_file: String, handler: Option<&mut
         callback: handler,
     }));
 
-    match unsafe { MoveFileWithProgressW(to_file_path(source_file), to_file_path(dest_file), Some(progress), Some(data as _), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING) } {
-        Ok(_) => {}
-        Err(e) => {
-            if e.code() != HRESULT::from_win32(1235) {
-                return Err(e.message());
-            }
-        }
-    }
+    let source_file_fallback = source_file.clone();
+    let dest_file_fallback = dest_file.clone();
+
+    match unsafe {
+        MoveFileWithProgressW(to_file_path(source_file), to_file_path(dest_file), Some(progress), Some(data as _), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
+    } {
+        Ok(_) => move_fallback(source_file_fallback, dest_file_fallback)?,
+        Err(e) => handle_move_error(e)?,
+    };
 
     Ok(())
 }
 
 pub(crate) fn mv_sync(source_file: String, dest_file: String) -> Result<bool, String> {
-    unsafe { MoveFileWithProgressW(to_file_path(source_file), to_file_path(dest_file), None, None, MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) }
-        .or_else(|e| Err(e.message()))?;
+    let source_file_fallback = source_file.clone();
+    let dest_file_fallback = dest_file.clone();
 
+    match unsafe { MoveFileWithProgressW(to_file_path(source_file), to_file_path(dest_file), None, None, MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) } {
+        Ok(_) => move_fallback(source_file_fallback, dest_file_fallback)?,
+        Err(e) => handle_move_error(e)?,
+    };
+
+    Ok(true)
+}
+
+fn move_fallback(source_file: String, dest_file: String) -> Result<bool, String> {
+    let source_file_exists = unsafe { GetFileAttributesW(to_file_path_str(&source_file)) } != FILE_NO_EXISTS;
+    let dest_file_exists = unsafe { GetFileAttributesW(to_file_path_str(&dest_file)) } != FILE_NO_EXISTS;
+
+    if source_file_exists && dest_file_exists {
+        unsafe { DeleteFileW(to_file_path_str(&source_file)) }.or_else(|e| Err(e.message()))?;
+    }
+
+    if source_file_exists && !dest_file_exists {
+        return Err("Did not move file.".to_string());
+    }
+
+    Ok(true)
+}
+
+fn handle_move_error(e: Error) -> Result<bool, String> {
+    if e.code() != HRESULT::from_win32(1235) {
+        return Err(e.message());
+    }
     Ok(true)
 }
 
 fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
     string.as_ref().encode_wide().chain(std::iter::once(0)).collect()
+}
+
+fn to_file_path_str(orig_file_path: &str) -> PCWSTR {
+    PCWSTR::from_raw(encode_wide(orig_file_path).as_ptr())
 }
 
 fn to_file_path(orig_file_path: String) -> PCWSTR {

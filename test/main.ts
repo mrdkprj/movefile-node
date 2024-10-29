@@ -37,7 +37,6 @@ const handleSetTitle = async (_e: any, s: string, d: string) => {
             sync ? mvSync(d, s) : await mv(d, s, progressCb);
             // sync ? mvSync(d, s) : await mv(d, s);
         }
-        console.log(id);
     } catch (ex: any) {
         console.log("error");
         console.log(ex);
@@ -49,7 +48,7 @@ const handleSetTitle = async (_e: any, s: string, d: string) => {
 let count = 0;
 const progressCb = (progress: Progress) => {
     count++;
-    console.log(progress);
+
     // if (count > 3) {
     //     cancel(id);
     // }

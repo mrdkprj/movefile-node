@@ -109,7 +109,6 @@ var handleSetTitle = function (_e, s, d) { return __awaiter(void 0, void 0, void
 var count = 0;
 var progressCb = function (progress) {
     count++;
-    console.log(progress);
     // if (count > 3) {
     //     cancel(id);
     // }
