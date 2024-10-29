@@ -1,0 +1,9 @@
+target
+**/node_modules
+**/.DS_Store
+npm-debug.log*
+build/index.node
+.vscode
+cargo.log
+/test/index.html
+/test/main.js
