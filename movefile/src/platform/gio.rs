@@ -90,3 +90,8 @@ pub(crate) fn cancel(id: u32) -> bool {
 
     false
 }
+
+pub(crate) fn trash(file: String) -> Result<(), String> {
+    let file = gio::File::for_parse_name(&file);
+    file.trash(Cancellable::NONE).or_else(|e| Err(e.message().to_string()))
+}
