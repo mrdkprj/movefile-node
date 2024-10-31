@@ -25,6 +25,12 @@ window.onload = () => {
 
     })
 
+    document.getElementById("trash").addEventListener("click", () => {
+        const s = document.getElementById("s").value
+        window.electronAPI.append(s);
+
+})
+
     window.addEventListener("keydown", e => {
         if(e.key == "Escape"){
             e.preventDefault();

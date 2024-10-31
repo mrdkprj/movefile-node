@@ -7,6 +7,9 @@ use std::{
         Mutex,
     },
 };
+// use windows::core::Interface;
+use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED};
+use windows::Win32::UI::Shell::{IFileOperation, IShellItem, SHCreateItemFromParsingName, FOF_ALLOWUNDO};
 use windows::{
     core::{Error, HRESULT, PCWSTR},
     Win32::{
@@ -32,6 +35,22 @@ pub(crate) fn reserve() -> u32 {
     tokens.insert(id, 0);
 
     id
+}
+
+pub(crate) fn trash(file: String) -> Result<(), String> {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+
+        let op: IFileOperation = CoCreateInstance(&windows::Win32::UI::Shell::FileOperation, None, CLSCTX_ALL).or_else(|e| Err(e.message()))?;
+        op.SetOperationFlags(FOF_ALLOWUNDO).or_else(|e| Err(e.message()))?;
+        let shell_item: IShellItem = SHCreateItemFromParsingName(to_file_path(file), None).or_else(|e| Err(e.message()))?;
+        op.DeleteItem(&shell_item, None).or_else(|e| Err(e.message()))?;
+        op.PerformOperations().or_else(|e| Err(e.message()))?;
+
+        CoUninitialize();
+    }
+
+    Ok(())
 }
 
 pub(crate) fn mv(source_file: String, dest_file: String, id: Option<u32>) -> Result<(), String> {
@@ -60,6 +79,31 @@ fn cancellable_move(source_file: String, dest_file: String, handler: Option<&mut
 
     Ok(())
 }
+
+// pub fn mv_files(source_files: Vec<String>, dest_dir: String) -> Result<(), String> {
+//     let dest_path = std::path::Path::new(&dest_dir);
+//     if dest_path.is_file() {
+//         return Err("Destination is file".to_string());
+//     }
+
+//     let mut total = 0;
+//     let mut dest_files = Vec::new();
+
+//     for source_file in source_files {
+//         let metadata = std::fs::metadata(&source_file).unwrap();
+//         total += metadata.len();
+//         let path = std::path::Path::new(&source_file);
+//         let name = path.file_name().unwrap();
+//         let dest_file = dest_path.join(name);
+//         dest_files.push(dest_file.to_string_lossy());
+//     }
+
+//     for (i, source_file) in source_files.clone().iter().enumerate() {
+//         unsafe { CopyFileExW(to_file_path_str(source_file), to_file_path_str(dest_files.get(i).unwrap()), None, None, None, 0) }.unwrap();
+//     }
+
+//     Ok(())
+// }
 
 pub(crate) fn mv_sync(source_file: String, dest_file: String) -> Result<bool, String> {
     let source_file_fallback = source_file.clone();

@@ -2,7 +2,7 @@ use neon::{
     object::Object,
     prelude::{Context, FunctionContext, ModuleContext},
     result::{JsResult, NeonResult},
-    types::{JsBoolean, JsFunction, JsNumber, JsPromise, JsString},
+    types::{JsBoolean, JsFunction, JsNumber, JsPromise, JsString, JsUndefined},
 };
 use once_cell::sync::Lazy;
 use std::{
@@ -148,12 +148,20 @@ pub fn cancel(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     Ok(cx.boolean(result))
 }
 
+pub fn trash(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let source_file = cx.argument::<JsString>(0)?.value(&mut cx);
+
+    let _ = movefile::trash(source_file);
+    Ok(cx.undefined())
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv", mv)?;
     cx.export_function("mvSync", mv_sync)?;
     cx.export_function("cancel", cancel)?;
     cx.export_function("reserve", reserve)?;
+    cx.export_function("trash", trash)?;
 
     Ok(())
 }

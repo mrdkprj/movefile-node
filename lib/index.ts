@@ -25,3 +25,7 @@ export const cancel = (id: number): boolean => {
 export const reserveId = (): number => {
     return MoveFile.reserve();
 };
+
+export const trash = (file: string): void => {
+    return MoveFile.trash(file);
+};

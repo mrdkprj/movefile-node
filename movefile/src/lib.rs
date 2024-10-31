@@ -20,3 +20,7 @@ pub fn mv_sync(source_file: String, dest_file: String) -> bool {
 pub fn cancel(id: u32) -> bool {
     platform_impl::cancel(id)
 }
+
+pub fn trash(file: String) -> Result<(), String> {
+    platform_impl::trash(file)
+}

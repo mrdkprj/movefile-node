@@ -4,6 +4,7 @@ declare namespace MoveFile {
     function mvSync(sourceFile:string, destFile:string): number;
     function cancel(id:number):boolean;
     function reserve():number;
+    function trash(file:string):void;
 }
 
 export = MoveFile;

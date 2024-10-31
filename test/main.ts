@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 
 import path from "path";
 import fs from "fs";
-import { mv, cancel, mvSync, Progress } from "../lib/index";
+import { mv, cancel, mvSync, Progress, trash } from "../lib/index";
 
 let id = -1;
 let sync = false;
@@ -65,11 +65,16 @@ const toggle = () => {
     }
 };
 
+const append = (_e: any, s: string) => {
+    console.log(s);
+    trash(s);
+};
+
 app.whenReady().then(async () => {
     createWindow();
     ipcMain.on("set-title", handleSetTitle);
     ipcMain.on("toggle", toggle);
-    ipcMain.on("append", toggle);
+    ipcMain.on("append", append);
     ipcMain.on("reload", toggle);
 });
 

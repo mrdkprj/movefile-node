@@ -6,7 +6,7 @@
     "install": "npm run build",
     "build": "cargo-cp-artifact -a cdylib movefile_node ./build/index.node -- cargo build --message-format=json-render-diagnostics --release && cargo clean",
     "build-release": "tsc ./lib/index.ts --esModuleInterop && npm run build",
-    "build-dev":"tsc ./lib/index.ts --esModuleInterop && cargo-cp-artifact -a cdylib movefile_node ./build/index.node -- cargo build --message-format=json-render-diagnostics --release"
+    "dev":"tsc ./lib/index.ts --esModuleInterop && cargo-cp-artifact -a cdylib movefile_node ./build/index.node -- cargo build --message-format=json-render-diagnostics --release"
   },
   "author": "mrdkprj",
   "license": "MIT",
