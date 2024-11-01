@@ -32,7 +32,7 @@ window.onload = () => {
     })
 
     document.getElementById("multi").addEventListener("click", () => {
-        window.electronAPI.reload(["D:\\Download\\test\\a.mp4","D:\\Download\\test\\b.mp4"], "C:\\Download");
+
 
     })
 

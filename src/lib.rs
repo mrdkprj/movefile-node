@@ -228,9 +228,9 @@ pub fn trash(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv", mv)?;
-    cx.export_function("mvSync", mv_sync)?;
+    cx.export_function("mv_sync", mv_sync)?;
     cx.export_function("cancel", cancel)?;
-    cx.export_function("reserveCancellable", reserve_cancellable)?;
+    cx.export_function("reserve_cancellable", reserve_cancellable)?;
     cx.export_function("trash", trash)?;
     cx.export_function("mv_bulk", mv_bulk)?;
 

@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 
 import path from "path";
 import fs from "fs";
-import { mv, cancel, mvSync, Progress, trash, mvBulk } from "../lib/index";
+import { mv, cancel, mvSync, Progress, trash, mvBulk, reserveCancellable } from "../lib/index";
 
 let id = -1;
 let sync = false;
@@ -25,6 +25,12 @@ const createWindow = () => {
 };
 
 const handleSetTitle = async (_e: any, s: string, d: string) => {
+    let id = reserveCancellable();
+    console.log(id);
+    const x = 10;
+    if (x > 0) {
+        return;
+    }
     count = 0;
     console.log("from");
     try {

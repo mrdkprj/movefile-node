@@ -23,15 +23,15 @@ export const mvBulk = async (sourceFiles: string[], destDir: string, callback?: 
 };
 
 export const mvSync = (sourceFile: string, destFile: string): number => {
-    return MoveFile.mvSync(sourceFile, destFile);
+    return MoveFile.mv_sync(sourceFile, destFile);
 };
 
 export const cancel = (id: number): boolean => {
     return MoveFile.cancel(id);
 };
 
-export const reserveId = (): number => {
-    return MoveFile.reserve();
+export const reserveCancellable = (): number => {
+    return MoveFile.reserve_cancellable();
 };
 
 export const trash = (file: string): void => {
