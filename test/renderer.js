@@ -29,7 +29,12 @@ window.onload = () => {
         const s = document.getElementById("s").value
         window.electronAPI.append(s);
 
-})
+    })
+
+    document.getElementById("multi").addEventListener("click", () => {
+        window.electronAPI.reload(["D:\\Download\\test\\a.mp4","D:\\Download\\test\\b.mp4"], "C:\\Download");
+
+    })
 
     window.addEventListener("keydown", e => {
         if(e.key == "Escape"){

@@ -16,15 +16,23 @@ use std::{
 static UUID: AtomicU32 = AtomicU32::new(0);
 static CALLBACKS: Lazy<Mutex<HashMap<u32, neon::handle::Root<JsFunction>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub fn reserve(mut cx: FunctionContext) -> JsResult<JsNumber> {
-    Ok(cx.number(movefile::reserve()))
+pub fn reserve_cancellable(mut cx: FunctionContext) -> JsResult<JsNumber> {
+    Ok(cx.number(movefile::reserve_cancellable()))
 }
 
 pub fn mv(cx: FunctionContext) -> JsResult<JsPromise> {
     if cx.len() > 3 {
-        listen_mv(cx)
+        listen_mv(cx, false)
     } else {
-        spawn_mv(cx)
+        spawn_mv(cx, false)
+    }
+}
+
+pub fn mv_bulk(cx: FunctionContext) -> JsResult<JsPromise> {
+    if cx.len() > 3 {
+        listen_mv(cx, true)
+    } else {
+        spawn_mv(cx, true)
     }
 }
 
@@ -43,27 +51,45 @@ fn extract_optional_id(cx: &mut FunctionContext, index: usize) -> Option<u32> {
     }
 }
 
-fn spawn_mv(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let source_file = cx.argument::<JsString>(0)?.value(&mut cx);
+fn spawn_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
+    let source_files: Vec<String> = if bulk {
+        cx.argument::<neon::types::JsArray>(0)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect()
+    } else {
+        vec![cx.argument::<JsString>(0)?.value(&mut cx)]
+    };
     let dest_file = cx.argument::<JsString>(1)?.value(&mut cx);
     let id = extract_optional_id(&mut cx, 2);
 
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
 
-    async_std::task::spawn(async move {
-        let result = movefile::mv(source_file, dest_file, id);
-        deferred.settle_with(&channel, |mut cx| match result {
-            Ok(_) => Ok(cx.undefined()),
-            Err(e) => cx.throw_error(e),
+    if bulk {
+        async_std::task::spawn(async move {
+            let result = movefile::mv_bulk(source_files, dest_file, None, id);
+            deferred.settle_with(&channel, |mut cx| match result {
+                Ok(_) => Ok(cx.undefined()),
+                Err(e) => cx.throw_error(e),
+            });
         });
-    });
+    } else {
+        async_std::task::spawn(async move {
+            let result = movefile::mv(source_files.first().unwrap().to_string(), dest_file, None, id);
+            deferred.settle_with(&channel, |mut cx| match result {
+                Ok(_) => Ok(cx.undefined()),
+                Err(e) => cx.throw_error(e),
+            });
+        });
+    }
 
     Ok(promise)
 }
 
-fn listen_mv(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let source_file = cx.argument::<JsString>(0)?.value(&mut cx);
+fn listen_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
+    let source_files: Vec<String> = if bulk {
+        cx.argument::<neon::types::JsArray>(0)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect()
+    } else {
+        vec![cx.argument::<JsString>(0)?.value(&mut cx)]
+    };
     let dest_file = cx.argument::<JsString>(1)?.value(&mut cx);
     let callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
     let id = extract_optional_id(&mut cx, 3);
@@ -75,58 +101,102 @@ fn listen_mv(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let mut callbacks = CALLBACKS.lock().unwrap();
     callbacks.insert(callback_id, callback);
 
-    async_std::task::spawn(async move {
-        let result = movefile::mv_with_progress(
-            source_file,
-            dest_file,
-            &mut |a, b| {
-                channel.send(move |mut cx| {
-                    let obj = cx.empty_object();
-                    let total = if cfg!(windows) {
-                        cx.number(a as f64)
-                    } else {
-                        cx.number(b as f64)
-                    };
-                    let transferred = if cfg!(windows) {
-                        cx.number(b as f64)
-                    } else {
-                        cx.number(a as f64)
-                    };
-                    obj.set(&mut cx, "totalFileSize", total).unwrap();
-                    obj.set(&mut cx, "transferred", transferred).unwrap();
-                    let this = cx.undefined();
-                    let args = vec![obj.upcast()];
-                    if let Ok(mut callbacks) = CALLBACKS.try_lock() {
-                        if let Some(callback) = callbacks.get(&callback_id) {
-                            callback.clone(&mut cx).into_inner(&mut cx).call(&mut cx, this, args).unwrap();
-                            if a == b {
-                                let _ = callbacks.remove(&callback_id);
+    if bulk {
+        async_std::task::spawn(async move {
+            let result = movefile::mv_bulk(
+                source_files,
+                dest_file,
+                Some(&mut |a, b| {
+                    channel.clone().send(move |mut cx| {
+                        let obj = cx.empty_object();
+                        let total = if cfg!(windows) {
+                            cx.number(a as f64)
+                        } else {
+                            cx.number(b as f64)
+                        };
+                        let transferred = if cfg!(windows) {
+                            cx.number(b as f64)
+                        } else {
+                            cx.number(a as f64)
+                        };
+                        obj.set(&mut cx, "totalFileSize", total).unwrap();
+                        obj.set(&mut cx, "transferred", transferred).unwrap();
+                        let this = cx.undefined();
+                        let args = vec![obj.upcast()];
+                        if let Ok(mut callbacks) = CALLBACKS.try_lock() {
+                            if let Some(callback) = callbacks.get(&callback_id) {
+                                callback.clone(&mut cx).into_inner(&mut cx).call(&mut cx, this, args).unwrap();
+                                if a == b {
+                                    let _ = callbacks.remove(&callback_id);
+                                }
                             }
                         }
-                    }
 
-                    Ok(())
-                });
-            },
-            id,
-        );
+                        Ok(())
+                    });
+                }),
+                id,
+            );
 
-        deferred.settle_with(&channel, |mut cx| match result {
-            Ok(_) => Ok(cx.undefined()),
-            Err(e) => cx.throw_error(e),
+            deferred.settle_with(&channel, |mut cx| match result {
+                Ok(_) => Ok(cx.undefined()),
+                Err(e) => cx.throw_error(e),
+            });
         });
-    });
+    } else {
+        async_std::task::spawn(async move {
+            let result = movefile::mv(
+                source_files.first().unwrap().to_string(),
+                dest_file,
+                Some(&mut |a, b| {
+                    channel.clone().send(move |mut cx| {
+                        let obj = cx.empty_object();
+                        let total = if cfg!(windows) {
+                            cx.number(a as f64)
+                        } else {
+                            cx.number(b as f64)
+                        };
+                        let transferred = if cfg!(windows) {
+                            cx.number(b as f64)
+                        } else {
+                            cx.number(a as f64)
+                        };
+                        obj.set(&mut cx, "totalFileSize", total).unwrap();
+                        obj.set(&mut cx, "transferred", transferred).unwrap();
+                        let this = cx.undefined();
+                        let args = vec![obj.upcast()];
+                        if let Ok(mut callbacks) = CALLBACKS.try_lock() {
+                            if let Some(callback) = callbacks.get(&callback_id) {
+                                callback.clone(&mut cx).into_inner(&mut cx).call(&mut cx, this, args).unwrap();
+                                if a == b {
+                                    let _ = callbacks.remove(&callback_id);
+                                }
+                            }
+                        }
+
+                        Ok(())
+                    });
+                }),
+                id,
+            );
+
+            deferred.settle_with(&channel, |mut cx| match result {
+                Ok(_) => Ok(cx.undefined()),
+                Err(e) => cx.throw_error(e),
+            });
+        });
+    }
 
     Ok(promise)
 }
 
-pub fn mv_sync(mut cx: FunctionContext) -> JsResult<JsBoolean> {
+pub fn mv_sync(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let source_file = cx.argument::<JsString>(0)?.value(&mut cx);
     let dest_file = cx.argument::<JsString>(1)?.value(&mut cx);
 
-    let result = movefile::mv_sync(source_file, dest_file);
+    let _ = movefile::mv(source_file, dest_file, None, None);
 
-    Ok(cx.boolean(result))
+    Ok(cx.undefined())
 }
 
 pub fn cancel(mut cx: FunctionContext) -> JsResult<JsBoolean> {
@@ -160,8 +230,9 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv", mv)?;
     cx.export_function("mvSync", mv_sync)?;
     cx.export_function("cancel", cancel)?;
-    cx.export_function("reserve", reserve)?;
+    cx.export_function("reserveCancellable", reserve_cancellable)?;
     cx.export_function("trash", trash)?;
+    cx.export_function("mv_bulk", mv_bulk)?;
 
     Ok(())
 }

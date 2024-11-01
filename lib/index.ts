@@ -14,6 +14,14 @@ export const mv = async (sourceFile: string, destFile: string, callback?: Progre
     }
 };
 
+export const mvBulk = async (sourceFiles: string[], destDir: string, callback?: ProgressCallback, id?: number) => {
+    if (callback) {
+        return await MoveFile.mv_bulk(sourceFiles, destDir, callback, id);
+    } else {
+        return await MoveFile.mv_bulk(sourceFiles, destDir, id);
+    }
+};
+
 export const mvSync = (sourceFile: string, destFile: string): number => {
     return MoveFile.mvSync(sourceFile, destFile);
 };

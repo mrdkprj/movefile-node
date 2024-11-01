@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 
 import path from "path";
 import fs from "fs";
-import { mv, cancel, mvSync, Progress, trash } from "../lib/index";
+import { mv, cancel, mvSync, Progress, trash, mvBulk } from "../lib/index";
 
 let id = -1;
 let sync = false;
@@ -53,7 +53,7 @@ const progressCb = (progress: Progress) => {
     //     cancel(id);
     // }
     const current = (progress.transferred / progress.totalFileSize) * 100;
-
+    console.log(progress);
     if (win) {
         win.webContents.send("progress", { current });
     }
@@ -66,8 +66,15 @@ const toggle = () => {
 };
 
 const append = (_e: any, s: string) => {
-    console.log(s);
     trash(s);
+};
+
+const reload = async (_e: any, s: string[], d: string) => {
+    try {
+        await mvBulk(s, d, progressCb);
+    } catch (ex: any) {
+        dialog.showErrorBox("e", ex.message);
+    }
 };
 
 app.whenReady().then(async () => {
@@ -75,7 +82,7 @@ app.whenReady().then(async () => {
     ipcMain.on("set-title", handleSetTitle);
     ipcMain.on("toggle", toggle);
     ipcMain.on("append", append);
-    ipcMain.on("reload", toggle);
+    ipcMain.on("reload", reload);
 });
 
 app.on("window-all-closed", () => {
