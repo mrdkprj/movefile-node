@@ -49,22 +49,6 @@ pub(crate) fn reserve_cancellable() -> u32 {
     id
 }
 
-pub(crate) fn trash(file: String) -> Result<(), String> {
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-
-        let op: IFileOperation = CoCreateInstance(&windows::Win32::UI::Shell::FileOperation, None, CLSCTX_ALL).map_err(|e| e.message())?;
-        op.SetOperationFlags(FOF_ALLOWUNDO).map_err(|e| e.message())?;
-        let shell_item: IShellItem = SHCreateItemFromParsingName(to_file_path(file), None).map_err(|e| e.message())?;
-        op.DeleteItem(&shell_item, None).map_err(|e| e.message())?;
-        op.PerformOperations().map_err(|e| e.message())?;
-
-        CoUninitialize();
-    }
-
-    Ok(())
-}
-
 pub(crate) fn mv(source_file: String, dest_file: String, callback: Option<&dyn Fn(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let callback = if let Some(callback) = callback {
         Some(callback)
@@ -283,4 +267,20 @@ pub(crate) fn cancel(id: u32) -> bool {
     }
 
     false
+}
+
+pub(crate) fn trash(file: String) -> Result<(), String> {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+
+        let op: IFileOperation = CoCreateInstance(&windows::Win32::UI::Shell::FileOperation, None, CLSCTX_ALL).map_err(|e| e.message())?;
+        op.SetOperationFlags(FOF_ALLOWUNDO).map_err(|e| e.message())?;
+        let shell_item: IShellItem = SHCreateItemFromParsingName(to_file_path(file), None).map_err(|e| e.message())?;
+        op.DeleteItem(&shell_item, None).map_err(|e| e.message())?;
+        op.PerformOperations().map_err(|e| e.message())?;
+
+        CoUninitialize();
+    }
+
+    Ok(())
 }

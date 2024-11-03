@@ -25,15 +25,11 @@ pub(crate) fn reserve_cancellable() -> u32 {
     id
 }
 
-pub(crate) fn mv(source_file: String, dest_file: String, id: Option<u32>) -> Result<(), String> {
-    cancellable_move(source_file, dest_file, None, id)
+pub(crate) fn mv(source_file: String, dest_file: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancellable: Option<u32>) -> Result<(), String> {
+    cancellable_move(source_file, dest_file, callback, cancellable)
 }
 
-pub(crate) fn mv_with_progress(source_file: String, dest_file: String, handler: &mut dyn FnMut(i64, i64), id: Option<u32>) -> Result<(), String> {
-    cancellable_move(source_file, dest_file, Some(handler), id)
-}
-
-fn cancellable_move(source_file: String, dest_file: String, handler: Option<&mut dyn FnMut(i64, i64)>, id: Option<u32>) -> Result<(), String> {
+fn cancellable_move(source_file: String, dest_file: String, callback: Option<&mut dyn FnMut(i64, i64)>, id: Option<u32>) -> Result<(), String> {
     let source = gio::File::for_parse_name(&source_file);
     let dest = gio::File::for_parse_name(&dest_file);
 
@@ -46,7 +42,7 @@ fn cancellable_move(source_file: String, dest_file: String, handler: Option<&mut
         Cancellable::new()
     };
 
-    match source.copy(&dest, gio::FileCopyFlags::from_bits(G_FILE_COPY_OVERWRITE | G_FILE_COPY_ALL_METADATA).unwrap(), Some(&cancellable_token), handler) {
+    match source.copy(&dest, gio::FileCopyFlags::from_bits(G_FILE_COPY_OVERWRITE | G_FILE_COPY_ALL_METADATA).unwrap(), Some(&cancellable_token), callback) {
         Ok(_) => {
             source.delete(Cancellable::NONE).map_err(|e| e.message().to_string())?;
             if let Ok(mut tokens) = CANCELABLES.try_lock() {
@@ -70,13 +66,9 @@ fn cancellable_move(source_file: String, dest_file: String, handler: Option<&mut
     Ok(())
 }
 
-pub(crate) fn mv_sync(source_file: String, dest_file: String) -> Result<bool, String> {
-    let source = gio::File::for_parse_name(&source_file);
-    let dest = gio::File::for_parse_name(&dest_file);
-
-    source.move_(&dest, gio::FileCopyFlags::from_bits(G_FILE_COPY_OVERWRITE | G_FILE_COPY_ALL_METADATA).unwrap(), Cancellable::NONE, None).map_err(|e| e.message().to_string())?;
-
-    Ok(true)
+#[allow(unused_variables)]
+pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+    Ok(())
 }
 
 pub(crate) fn cancel(id: u32) -> bool {
