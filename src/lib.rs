@@ -106,7 +106,7 @@ fn listen_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
             let result = movefile::mv_bulk(
                 source_files,
                 dest_file,
-                Some(&mut |a, b| {
+                Some(&|a, b| {
                     channel.clone().send(move |mut cx| {
                         let obj = cx.empty_object();
                         let total = if cfg!(windows) {
@@ -148,7 +148,7 @@ fn listen_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
             let result = movefile::mv(
                 source_files.first().unwrap().to_string(),
                 dest_file,
-                Some(&mut |a, b| {
+                Some(&|a, b| {
                     channel.clone().send(move |mut cx| {
                         let obj = cx.empty_object();
                         let total = if cfg!(windows) {
