@@ -16,6 +16,13 @@ use std::{
 static UUID: AtomicU32 = AtomicU32::new(0);
 static CANCELABLES: Lazy<Mutex<HashMap<u32, Cancellable>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
+struct BulkProgressData<'a> {
+    callback: Option<&'a mut dyn FnMut(i64, i64)>,
+    total: i64,
+    processed: i64,
+    in_process: bool,
+}
+
 pub(crate) fn reserve_cancellable() -> u32 {
     let id = UUID.fetch_add(1, Ordering::Relaxed);
 
@@ -95,23 +102,12 @@ pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mu
         Cancellable::new()
     };
 
-    let id = UUID.fetch_add(1, Ordering::Relaxed);
     let data = Box::into_raw(Box::new(BulkProgressData {
-        id,
         callback,
+        total,
+        processed: 0,
+        in_process: true,
     }));
-
-    {
-        let status = BulkProgressStatus {
-            total,
-            processed: 0,
-            in_process: true,
-        };
-
-        if let Ok(mut progress_status) = PROGRESS_STATUS.try_lock() {
-            progress_status.insert(id, status);
-        }
-    }
 
     let flags = gio::FileCopyFlags::from_bits(G_FILE_COPY_OVERWRITE | G_FILE_COPY_ALL_METADATA).unwrap().bits();
 
@@ -157,40 +153,23 @@ pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mu
     Ok(())
 }
 
-static PROGRESS_STATUS: Lazy<Mutex<HashMap<u32, BulkProgressStatus>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-
-struct BulkProgressData<'a> {
-    id: u32,
-    callback: Option<&'a mut dyn FnMut(i64, i64)>,
-}
-
-struct BulkProgressStatus {
-    total: i64,
-    processed: i64,
-    in_process: bool,
-}
-
 unsafe extern "C" fn progress_callback(current_num_bytes: i64, total_num_bytes: i64, userdata: gio::glib::ffi::gpointer) {
     let item_data_ptr = userdata as *mut BulkProgressData;
     let data = unsafe { &mut *item_data_ptr };
 
-    if let Ok(mut progress_status) = PROGRESS_STATUS.try_lock() {
-        if let Some(progress) = progress_status.get_mut(&data.id) {
-            if total_num_bytes == current_num_bytes {
-                progress.in_process = !progress.in_process;
-            }
+    if total_num_bytes == current_num_bytes {
+        data.in_process = !data.in_process;
+    }
 
-            if progress.in_process {
-                let current = progress.processed + current_num_bytes;
+    if data.in_process {
+        let current = data.processed + current_num_bytes;
 
-                if total_num_bytes == current_num_bytes {
-                    progress.processed = progress.processed + total_num_bytes;
-                }
+        if total_num_bytes == current_num_bytes {
+            data.processed = data.processed + total_num_bytes;
+        }
 
-                if let Some(callback) = data.callback.as_mut() {
-                    callback(current, progress.total);
-                }
-            }
+        if let Some(callback) = data.callback.as_mut() {
+            callback(current, data.total);
         }
     }
 }
