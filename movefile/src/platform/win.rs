@@ -1,19 +1,22 @@
 use once_cell::sync::Lazy;
-use std::os::windows::ffi::OsStrExt;
 use std::{
     collections::HashMap,
+    ffi::c_void,
+    fs,
+    os::windows::ffi::OsStrExt,
+    path::Path,
     sync::{
         atomic::{AtomicU32, Ordering},
         Mutex,
     },
 };
-use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED};
-use windows::Win32::UI::Shell::{IFileOperation, IShellItem, SHCreateItemFromParsingName, FOF_ALLOWUNDO};
 use windows::{
     core::{Error, HRESULT, PCWSTR},
     Win32::{
         Foundation::HANDLE,
         Storage::FileSystem::{DeleteFileW, GetFileAttributesW, MoveFileWithProgressW, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH},
+        System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED},
+        UI::Shell::{FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, FOF_ALLOWUNDO},
     },
 };
 
@@ -21,6 +24,7 @@ static UUID: AtomicU32 = AtomicU32::new(0);
 static CANCELLABLES: Lazy<Mutex<HashMap<u32, u32>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 const PROGRESS_CANCEL: u32 = 1;
 const FILE_NO_EXISTS: u32 = 4294967295;
+const CANCEL_ERROR_CODE: HRESULT = HRESULT::from_win32(1235);
 
 struct ProgressData<'a> {
     cancel_id: Option<u32>,
@@ -80,7 +84,7 @@ pub(crate) fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Opt
 }
 
 fn inner_mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
-    let dest_dir_path = std::path::Path::new(&dest_dir);
+    let dest_dir_path = Path::new(&dest_dir);
     if dest_dir_path.is_file() {
         return Err("Destination is file".to_string());
     }
@@ -90,9 +94,9 @@ fn inner_mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&
     let owned_source_files = source_files.clone();
 
     for source_file in source_files {
-        let metadata = std::fs::metadata(&source_file).unwrap();
+        let metadata = fs::metadata(&source_file).unwrap();
         total += metadata.len() as i64;
-        let path = std::path::Path::new(&source_file);
+        let path = Path::new(&source_file);
         let name = path.file_name().unwrap();
         let dest_file = dest_dir_path.join(name);
         dest_files.push(dest_file.to_string_lossy().to_string());
@@ -148,11 +152,11 @@ fn move_fallback(source_file: String, dest_file: String) -> Result<bool, String>
 }
 
 fn handle_move_error(e: Error, treat_cancel_as_error: bool) -> Result<bool, String> {
-    if e.code() != HRESULT::from_win32(1235) {
+    if e.code() != CANCEL_ERROR_CODE {
         return Err(e.message());
     }
 
-    if treat_cancel_as_error && e.code() != HRESULT::from_win32(1235) {
+    if treat_cancel_as_error && e.code() != CANCEL_ERROR_CODE {
         return Ok(false);
     }
 
@@ -190,7 +194,7 @@ unsafe extern "system" fn move_progress(
     _dwcallbackreason: LPPROGRESS_ROUTINE_CALLBACK_REASON,
     _hsourcefile: HANDLE,
     _hdestinationfile: HANDLE,
-    lpdata: *const core::ffi::c_void,
+    lpdata: *const c_void,
 ) -> u32 {
     let data_ptr = lpdata as *mut ProgressData;
     let data = unsafe { &mut *data_ptr };
@@ -219,7 +223,7 @@ unsafe extern "system" fn move_files_progress(
     _dwcallbackreason: LPPROGRESS_ROUTINE_CALLBACK_REASON,
     _hsourcefile: HANDLE,
     _hdestinationfile: HANDLE,
-    lpdata: *const core::ffi::c_void,
+    lpdata: *const c_void,
 ) -> u32 {
     let data_ptr = lpdata as *mut ProgressData;
     let data = unsafe { &mut *data_ptr };
@@ -259,7 +263,7 @@ pub(crate) fn trash(file: String) -> Result<(), String> {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
 
-        let op: IFileOperation = CoCreateInstance(&windows::Win32::UI::Shell::FileOperation, None, CLSCTX_ALL).map_err(|e| e.message())?;
+        let op: IFileOperation = CoCreateInstance(&FileOperation, None, CLSCTX_ALL).map_err(|e| e.message())?;
         op.SetOperationFlags(FOF_ALLOWUNDO).map_err(|e| e.message())?;
         let shell_item: IShellItem = SHCreateItemFromParsingName(to_file_path(file), None).map_err(|e| e.message())?;
         op.DeleteItem(&shell_item, None).map_err(|e| e.message())?;
