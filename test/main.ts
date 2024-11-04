@@ -76,6 +76,7 @@ const append = (_e: any, s: string) => {
 };
 
 const reload = async (_e: any, s: string[], d: string) => {
+    console.log("reload")
     try {
         await mvBulk(s, d, progressCb);
     } catch (ex: any) {

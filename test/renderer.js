@@ -33,7 +33,7 @@ window.onload = () => {
 
     document.getElementById("multi").addEventListener("click", () => {
 
-
+        window.electronAPI.reload(["/mnt/d/2023.mp4","/mnt/d/2024.mp4"], "/mnt/c/DevProjects");
     })
 
     window.addEventListener("keydown", e => {
