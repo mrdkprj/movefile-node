@@ -19,25 +19,15 @@ use windows::{
 
 static UUID: AtomicU32 = AtomicU32::new(0);
 static CANCELLABLES: Lazy<Mutex<HashMap<u32, u32>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static PROGRESS_STATUS: Lazy<Mutex<HashMap<u32, BulkProgressStatus>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 const PROGRESS_CANCEL: u32 = 1;
 const FILE_NO_EXISTS: u32 = 4294967295;
 
 struct ProgressData<'a> {
     cancel_id: Option<u32>,
-    callback: Option<&'a dyn Fn(i64, i64)>,
-}
-
-struct BulkProgressStatus {
+    callback: Option<&'a mut dyn FnMut(i64, i64)>,
     total: i64,
     prev: i64,
     processed: i64,
-}
-
-struct BulkProgressData<'a> {
-    id: u32,
-    cancel_id: Option<u32>,
-    callback: Option<&'a dyn Fn(i64, i64)>,
 }
 
 pub(crate) fn reserve_cancellable() -> u32 {
@@ -49,7 +39,13 @@ pub(crate) fn reserve_cancellable() -> u32 {
     id
 }
 
-pub(crate) fn mv(source_file: String, dest_file: String, callback: Option<&dyn Fn(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+pub(crate) fn mv(source_file: String, dest_file: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+    let result = inner_mv(source_file, dest_file, callback, cancel_id);
+    clean_up(cancel_id);
+    result
+}
+
+fn inner_mv(source_file: String, dest_file: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let callback = if let Some(callback) = callback {
         Some(callback)
     } else {
@@ -59,6 +55,9 @@ pub(crate) fn mv(source_file: String, dest_file: String, callback: Option<&dyn F
     let data = Box::into_raw(Box::new(ProgressData {
         cancel_id,
         callback,
+        total: 0,
+        prev: 0,
+        processed: 0,
     }));
 
     let source_file_fallback = source_file.clone();
@@ -74,7 +73,13 @@ pub(crate) fn mv(source_file: String, dest_file: String, callback: Option<&dyn F
     Ok(())
 }
 
-pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&dyn Fn(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+pub(crate) fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+    let result = inner_mv_bulk(source_files, dest_dir, callback, cancel_id);
+    clean_up(cancel_id);
+    result
+}
+
+fn inner_mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let dest_dir_path = std::path::Path::new(&dest_dir);
     if dest_dir_path.is_file() {
         return Err("Destination is file".to_string());
@@ -93,24 +98,13 @@ pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&dy
         dest_files.push(dest_file.to_string_lossy().to_string());
     }
 
-    let id = UUID.fetch_add(1, Ordering::Relaxed);
-    let data = Box::into_raw(Box::new(BulkProgressData {
-        id,
+    let data = Box::into_raw(Box::new(ProgressData {
         cancel_id,
         callback,
+        total,
+        prev: 0,
+        processed: 0,
     }));
-
-    {
-        let status = BulkProgressStatus {
-            total,
-            prev: 0,
-            processed: 0,
-        };
-
-        if let Ok(mut progress_status) = PROGRESS_STATUS.try_lock() {
-            progress_status.insert(id, status);
-        }
-    }
 
     for (i, source_file) in owned_source_files.iter().enumerate() {
         let dest_file = dest_files.get(i).unwrap();
@@ -133,10 +127,6 @@ pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&dy
         if !done {
             break;
         }
-    }
-
-    if let Ok(mut progress_status) = PROGRESS_STATUS.try_lock() {
-        let _ = progress_status.remove(&id);
     }
 
     Ok(())
@@ -169,6 +159,16 @@ fn handle_move_error(e: Error, treat_cancel_as_error: bool) -> Result<bool, Stri
     Ok(true)
 }
 
+fn clean_up(cancel_id: Option<u32>) {
+    if let Ok(mut tokens) = CANCELLABLES.try_lock() {
+        if let Some(id) = cancel_id {
+            if tokens.get(&id).is_some() {
+                tokens.remove(&id);
+            }
+        }
+    }
+}
+
 fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
     string.as_ref().encode_wide().chain(std::iter::once(0)).collect()
 }
@@ -195,19 +195,14 @@ unsafe extern "system" fn move_progress(
     let data_ptr = lpdata as *mut ProgressData;
     let data = unsafe { &mut *data_ptr };
 
-    if let Some(callback) = &data.callback {
+    if let Some(callback) = data.callback.as_mut() {
         callback(totalfilesize, totalbytestransferred);
     }
 
     if let Some(cancel_id) = data.cancel_id {
-        if let Ok(mut cancellables) = CANCELLABLES.try_lock() {
+        if let Ok(cancellables) = CANCELLABLES.try_lock() {
             if let Some(cancellable) = cancellables.get(&cancel_id) {
-                if *cancellable != 0 {
-                    let cancellable = cancellables.remove(&cancel_id).unwrap();
-                    return cancellable;
-                } else {
-                    return *cancellable;
-                }
+                return *cancellable;
             }
         }
     }
@@ -226,31 +221,22 @@ unsafe extern "system" fn move_files_progress(
     _hdestinationfile: HANDLE,
     lpdata: *const core::ffi::c_void,
 ) -> u32 {
-    let data_ptr = lpdata as *mut BulkProgressData;
+    let data_ptr = lpdata as *mut ProgressData;
     let data = unsafe { &mut *data_ptr };
 
-    if let Ok(mut progress_status) = PROGRESS_STATUS.try_lock() {
-        if let Some(progress) = progress_status.get_mut(&data.id) {
-            if totalbytestransferred - progress.prev > 0 {
-                progress.processed += totalbytestransferred - progress.prev;
-            }
-            progress.prev = totalbytestransferred;
+    if totalbytestransferred - data.prev > 0 {
+        data.processed += totalbytestransferred - data.prev;
+    }
+    data.prev = totalbytestransferred;
 
-            if let Some(callback) = data.callback {
-                callback(progress.total, progress.processed);
-            }
-        }
+    if let Some(callback) = data.callback.as_mut() {
+        callback(data.total, data.processed);
     }
 
     if let Some(cancel_id) = data.cancel_id {
-        if let Ok(mut cancellables) = CANCELLABLES.try_lock() {
+        if let Ok(cancellables) = CANCELLABLES.try_lock() {
             if let Some(cancellable) = cancellables.get(&cancel_id) {
-                if *cancellable != 0 {
-                    let cancellable = cancellables.remove(&cancel_id).unwrap();
-                    return cancellable;
-                } else {
-                    return *cancellable;
-                }
+                return *cancellable;
             }
         }
     }

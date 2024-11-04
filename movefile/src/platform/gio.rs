@@ -14,9 +14,9 @@ use std::{
 };
 
 static UUID: AtomicU32 = AtomicU32::new(0);
-static CANCELABLES: Lazy<Mutex<HashMap<u32, Cancellable>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static CANCELLABLES: Lazy<Mutex<HashMap<u32, Cancellable>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-struct BulkProgressData<'a> {
+struct ProgressData<'a> {
     callback: Option<&'a mut dyn FnMut(i64, i64)>,
     total: i64,
     processed: i64,
@@ -26,7 +26,7 @@ struct BulkProgressData<'a> {
 pub(crate) fn reserve_cancellable() -> u32 {
     let id = UUID.fetch_add(1, Ordering::Relaxed);
 
-    let mut tokens = CANCELABLES.lock().unwrap();
+    let mut tokens = CANCELLABLES.lock().unwrap();
     let token = Cancellable::new();
     tokens.insert(id, token);
 
@@ -43,7 +43,7 @@ fn cancellable_move(source_file: String, dest_file: String, callback: Option<&mu
 
     let cancellable_token = if let Some(id) = id {
         {
-            let tokens = CANCELABLES.lock().unwrap();
+            let tokens = CANCELLABLES.lock().unwrap();
             tokens.get(&id).unwrap().clone()
         }
     } else {
@@ -53,7 +53,7 @@ fn cancellable_move(source_file: String, dest_file: String, callback: Option<&mu
     match source.copy(&dest, gio::FileCopyFlags::from_bits(G_FILE_COPY_OVERWRITE | G_FILE_COPY_ALL_METADATA).unwrap(), Some(&cancellable_token), callback) {
         Ok(_) => {
             source.delete(Cancellable::NONE).map_err(|e| e.message().to_string())?;
-            if let Ok(mut tokens) = CANCELABLES.try_lock() {
+            if let Ok(mut tokens) = CANCELLABLES.try_lock() {
                 if let Some(id) = id {
                     if tokens.get(&id).is_some() {
                         tokens.remove(&id);
@@ -67,6 +67,14 @@ fn cancellable_move(source_file: String, dest_file: String, callback: Option<&mu
             }
             if !e.matches(gio::IOErrorEnum::Cancelled) {
                 return Err(e.message().to_string());
+            }
+        }
+    }
+
+    if let Ok(mut tokens) = CANCELLABLES.try_lock() {
+        if let Some(id) = cancel_id {
+            if tokens.get(&id).is_some() {
+                tokens.remove(&id);
             }
         }
     }
@@ -95,14 +103,14 @@ pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mu
 
     let cancellable_token = if let Some(id) = cancel_id {
         {
-            let tokens = CANCELABLES.lock().unwrap();
+            let tokens = CANCELLABLES.lock().unwrap();
             tokens.get(&id).unwrap().clone()
         }
     } else {
         Cancellable::new()
     };
 
-    let data = Box::into_raw(Box::new(BulkProgressData {
+    let data = Box::into_raw(Box::new(ProgressData {
         callback,
         total,
         processed: 0,
@@ -142,7 +150,7 @@ pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mu
         }
     }
 
-    if let Ok(mut tokens) = CANCELABLES.try_lock() {
+    if let Ok(mut tokens) = CANCELLABLES.try_lock() {
         if let Some(id) = cancel_id {
             if tokens.get(&id).is_some() {
                 tokens.remove(&id);
@@ -154,7 +162,7 @@ pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mu
 }
 
 unsafe extern "C" fn progress_callback(current_num_bytes: i64, total_num_bytes: i64, userdata: gio::glib::ffi::gpointer) {
-    let item_data_ptr = userdata as *mut BulkProgressData;
+    let item_data_ptr = userdata as *mut ProgressData;
     let data = unsafe { &mut *item_data_ptr };
 
     if total_num_bytes == current_num_bytes {
@@ -175,7 +183,7 @@ unsafe extern "C" fn progress_callback(current_num_bytes: i64, total_num_bytes: 
 }
 
 pub(crate) fn cancel(id: u32) -> bool {
-    if let Ok(mut tokens) = CANCELABLES.try_lock() {
+    if let Ok(mut tokens) = CANCELLABLES.try_lock() {
         if let Some(token) = tokens.get(&id) {
             token.cancel();
             tokens.remove(&id);
