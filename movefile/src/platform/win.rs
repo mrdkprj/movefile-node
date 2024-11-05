@@ -71,7 +71,7 @@ fn inner_mv(source_file: String, dest_file: String, callback: Option<&mut dyn Fn
         MoveFileWithProgressW(to_file_path(source_file), to_file_path(dest_file), Some(move_progress), Some(data as _), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
     } {
         Ok(_) => move_fallback(source_file_fallback, dest_file_fallback)?,
-        Err(e) => handle_move_error(e, false)?,
+        Err(e) => handle_move_error(e, source_file_fallback, false)?,
     };
 
     Ok(())
@@ -125,7 +125,7 @@ fn inner_mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&
             )
         } {
             Ok(_) => move_fallback(source_file_fallback, dest_file_fallback)?,
-            Err(e) => handle_move_error(e, true)?,
+            Err(e) => handle_move_error(e, source_file_fallback, true)?,
         };
 
         if !done {
@@ -151,9 +151,9 @@ fn move_fallback(source_file: String, dest_file: String) -> Result<bool, String>
     Ok(true)
 }
 
-fn handle_move_error(e: Error, treat_cancel_as_error: bool) -> Result<bool, String> {
+fn handle_move_error(e: Error, file: String, treat_cancel_as_error: bool) -> Result<bool, String> {
     if e.code() != CANCEL_ERROR_CODE {
-        return Err(e.message());
+        return Err(format!("file:{}, message:{}", file, e.message()));
     }
 
     if treat_cancel_as_error && e.code() != CANCEL_ERROR_CODE {

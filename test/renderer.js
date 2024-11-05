@@ -35,7 +35,7 @@ window.onload = () => {
         if(navigator.userAgent.includes("Linux")) {
             window.electronAPI.reload(["/mnt/d/2023.mp4","/mnt/d/2024.mp4"], "/mnt/c/DevProjects");
         }else{
-            window.electronAPI.reload(["D:\\2023.mp4","D:\\2024.mp4"], "C:\\DevProjects");
+            window.electronAPI.reload(["D:\\a - コピー.mp4","D:\\a - コピー - コピー.mp4"], "C:\\DevProjects");
         }
     })
 
