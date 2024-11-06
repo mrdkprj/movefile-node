@@ -143,7 +143,7 @@ fn handel_error(e: Error, file: String, treat_cancel_as_error: bool) -> Result<b
         return Err(format!("File:{}, Message:{}", file, e.message()));
     }
 
-    if treat_cancel_as_error && e.code() != CANCEL_ERROR_CODE {
+    if treat_cancel_as_error && e.code() == CANCEL_ERROR_CODE {
         return Ok(false);
     }
 
