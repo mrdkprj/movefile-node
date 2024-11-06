@@ -140,7 +140,7 @@ fn after_copy(source_file: String, _dest_file: String) -> Result<bool, String> {
 
 fn handel_error(e: Error, file: String, treat_cancel_as_error: bool) -> Result<bool, String> {
     if e.code() != CANCEL_ERROR_CODE {
-        return Err(format!("file:{}, message:{}", file, e.message()));
+        return Err(format!("File:{}, Message:{}", file, e.message()));
     }
 
     if treat_cancel_as_error && e.code() != CANCEL_ERROR_CODE {
