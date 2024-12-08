@@ -1,3 +1,4 @@
+use crate::{FileAttribute, Volume};
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
@@ -13,8 +14,8 @@ use std::{
 use windows::{
     core::{Error, HRESULT, PCWSTR},
     Win32::{
-        Foundation::{BOOL, HANDLE},
-        Storage::FileSystem::{CopyFileExW, DeleteFileW, GetFileAttributesW, LPPROGRESS_ROUTINE_CALLBACK_REASON},
+        Foundation::{BOOL, HANDLE, MAX_PATH},
+        Storage::FileSystem::*,
         System::{
             Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED},
             WindowsProgramming::{COPY_FILE_ALLOW_DECRYPTED_DESTINATION, COPY_FILE_COPY_SYMLINK},
@@ -28,6 +29,60 @@ static CANCELLABLES: Lazy<Mutex<HashMap<u32, u32>>> = Lazy::new(|| Mutex::new(Ha
 const PROGRESS_CANCEL: u32 = 1;
 const FILE_NO_EXISTS: u32 = 4294967295;
 const CANCEL_ERROR_CODE: HRESULT = HRESULT::from_win32(1235);
+
+pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
+    let mut volumes: Vec<Volume> = Vec::new();
+
+    let mut volume_name = vec![0u16; MAX_PATH as usize];
+    let handle = unsafe { FindFirstVolumeW(&mut volume_name).map_err(|e| e.message()) }?;
+
+    loop {
+        let mut drive_paths = vec![0u16; 261];
+        let mut len = 0;
+        unsafe { GetVolumePathNamesForVolumeNameW(PCWSTR::from_raw(volume_name.as_ptr()), Some(&mut drive_paths), &mut len).map_err(|e| e.message()) }?;
+
+        let mount_point = decode_wide(&drive_paths);
+
+        let mut volume_label_ptr = vec![0u16; 261];
+        unsafe { GetVolumeInformationW(PCWSTR(volume_name.as_ptr()), Some(&mut volume_label_ptr), None, None, None, None).map_err(|e| e.message()) }?;
+
+        let volume_label = decode_wide(&volume_label_ptr);
+
+        volumes.push(Volume {
+            mount_point,
+            volume_label,
+        });
+
+        volume_name = vec![0u16; MAX_PATH as usize];
+        let next = unsafe { FindNextVolumeW(handle, &mut volume_name) };
+        if next.is_err() {
+            break;
+        }
+    }
+
+    unsafe { FindVolumeClose(handle).map_err(|e| e.message()) }?;
+
+    Ok(volumes)
+}
+
+pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
+    let mut find_data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
+    let _handle: HANDLE = unsafe { FindFirstFileW(to_file_path_str(file_path), &mut find_data).map_err(|e| e.message()) }?;
+    let attributes = find_data.dwFileAttributes;
+
+    Ok(FileAttribute {
+        read_only: attributes & FILE_ATTRIBUTE_READONLY.0 != 0,
+        hidden: attributes & FILE_ATTRIBUTE_HIDDEN.0 != 0,
+        system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,
+        device: attributes & FILE_ATTRIBUTE_DEVICE.0 != 0,
+    })
+}
+
+pub(crate) fn decode_wide(wide: &[u16]) -> String {
+    let len = unsafe { windows::Win32::Globalization::lstrlenW(PCWSTR::from_raw(wide.as_ptr())) } as usize;
+    let w_str_slice = unsafe { std::slice::from_raw_parts(wide.as_ptr(), len) };
+    String::from_utf16_lossy(w_str_slice)
+}
 
 struct ProgressData<'a> {
     cancel_id: Option<u32>,

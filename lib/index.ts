@@ -5,6 +5,16 @@ export type Progress = {
     transferred: number;
 };
 export type ProgressCallback = (progress: Progress) => void;
+export type Volume = {
+    mountPoint: string;
+    volumeLabel: string;
+};
+export type FileAttribute = {
+    readOnly: boolean;
+    hidden: boolean;
+    system: boolean;
+    device: boolean;
+};
 
 export const mv = async (sourceFile: string, destFile: string, callback?: ProgressCallback, id?: number) => {
     if (callback) {
@@ -36,4 +46,12 @@ export const reserveCancellable = (): number => {
 
 export const trash = (file: string): void => {
     return MoveFile.trash(file);
+};
+
+export const listVolumes = (): Volume[] => {
+    return MoveFile.list_volumes();
+};
+
+export const getFileAttribute = (filePath: string): FileAttribute => {
+    return MoveFile.get_file_attribute(filePath);
 };

@@ -20,3 +20,25 @@ pub fn cancel(id: u32) -> bool {
 pub fn trash(file: String) -> Result<(), String> {
     platform_impl::trash(file)
 }
+
+#[derive(Debug, Clone)]
+pub struct Volume {
+    pub mount_point: String,
+    pub volume_label: String,
+}
+
+pub fn list_volumes() -> Result<Vec<Volume>, String> {
+    platform_impl::list_volumes()
+}
+
+#[derive(Debug, Clone)]
+pub struct FileAttribute {
+    pub read_only: bool,
+    pub hidden: bool,
+    pub system: bool,
+    pub device: bool,
+}
+
+pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
+    platform_impl::get_file_attribute(file_path)
+}

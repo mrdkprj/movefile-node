@@ -7,6 +7,8 @@ declare namespace MoveFile {
     function cancel(id:number):boolean;
     function reserve_cancellable():number;
     function trash(file:string):void;
+    function list_volumes():any[];
+    function get_file_attribute(filePath:string):any;
 }
 
 export = MoveFile;

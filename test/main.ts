@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 
 import path from "path";
 import fs from "fs";
-import { mv, cancel, mvSync, Progress, trash, mvBulk, reserveCancellable } from "../lib/index";
+import { mv, cancel, mvSync, Progress, trash, mvBulk, reserveCancellable, listVolumes, getFileAttribute } from "../lib/index";
 
 let id = -1;
 let sync = false;
@@ -21,6 +21,12 @@ const createWindow = () => {
         },
     });
 
+    console.log(new Date());
+    const x = listVolumes();
+    console.log(x);
+    const f = getFileAttribute("path");
+    console.log(f);
+    console.log(new Date());
     win.loadFile("index.html");
 };
 
@@ -76,7 +82,7 @@ const append = (_e: any, s: string) => {
 };
 
 const reload = async (_e: any, s: string[], d: string) => {
-    console.log("reload")
+    console.log("reload");
     try {
         await mvBulk(s, d, progressCb);
     } catch (ex: any) {

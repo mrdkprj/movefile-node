@@ -2,7 +2,7 @@ use neon::{
     object::Object,
     prelude::{Context, FunctionContext, ModuleContext},
     result::{JsResult, NeonResult},
-    types::{JsBoolean, JsFunction, JsNumber, JsPromise, JsString, JsUndefined},
+    types::{JsArray, JsBoolean, JsFunction, JsNumber, JsObject, JsPromise, JsString, JsUndefined},
 };
 use once_cell::sync::Lazy;
 use std::{
@@ -15,6 +15,43 @@ use std::{
 
 static UUID: AtomicU32 = AtomicU32::new(0);
 static CALLBACKS: Lazy<Mutex<HashMap<u32, neon::handle::Root<JsFunction>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+pub fn list_volumes(mut cx: FunctionContext) -> JsResult<JsArray> {
+    match movefile::list_volumes() {
+        Ok(volumes) => {
+            let arr = cx.empty_array();
+            for (i, volume) in volumes.iter().enumerate() {
+                let obj = cx.empty_object();
+                let a = cx.string(&volume.mount_point);
+                obj.set(&mut cx, "mountPoint", a).unwrap();
+                let a = cx.string(&volume.volume_label);
+                obj.set(&mut cx, "volumeLabel", a).unwrap();
+                arr.set(&mut cx, i as u32, obj).unwrap();
+            }
+            Ok(arr)
+        }
+        Err(e) => cx.throw_error(e),
+    }
+}
+
+pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    match movefile::get_file_attribute(&file_path) {
+        Ok(att) => {
+            let obj = cx.empty_object();
+            let a = cx.boolean(att.read_only);
+            obj.set(&mut cx, "readOnly", a).unwrap();
+            let a = cx.boolean(att.hidden);
+            obj.set(&mut cx, "hidden", a).unwrap();
+            let a = cx.boolean(att.system);
+            obj.set(&mut cx, "system", a).unwrap();
+            let a = cx.boolean(att.device);
+            obj.set(&mut cx, "device", a).unwrap();
+            Ok(obj)
+        }
+        Err(e) => cx.throw_error(e),
+    }
+}
 
 pub fn reserve_cancellable(mut cx: FunctionContext) -> JsResult<JsNumber> {
     Ok(cx.number(movefile::reserve_cancellable()))
@@ -233,6 +270,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("reserve_cancellable", reserve_cancellable)?;
     cx.export_function("trash", trash)?;
     cx.export_function("mv_bulk", mv_bulk)?;
-
+    cx.export_function("list_volumes", list_volumes)?;
+    cx.export_function("get_file_attribute", get_file_attribute)?;
     Ok(())
 }
