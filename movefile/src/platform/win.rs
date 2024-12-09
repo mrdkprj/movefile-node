@@ -67,16 +67,22 @@ pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
 }
 
 pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
-    let mut find_data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
-    let _handle: HANDLE = unsafe { FindFirstFileW(to_file_path_str(file_path), &mut find_data).map_err(|e| e.message()) }?;
-    let attributes = find_data.dwFileAttributes;
-
-    Ok(FileAttribute {
-        read_only: attributes & FILE_ATTRIBUTE_READONLY.0 != 0,
-        hidden: attributes & FILE_ATTRIBUTE_HIDDEN.0 != 0,
-        system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,
-        device: attributes & FILE_ATTRIBUTE_DEVICE.0 != 0,
-    })
+    let attributes = unsafe { GetFileAttributesW(to_file_path_str(file_path)) };
+    if attributes == INVALID_FILE_ATTRIBUTES {
+        Ok(FileAttribute {
+            read_only: false,
+            hidden: false,
+            system: false,
+            device: false,
+        })
+    } else {
+        Ok(FileAttribute {
+            read_only: attributes & FILE_ATTRIBUTE_READONLY.0 != 0,
+            hidden: attributes & FILE_ATTRIBUTE_HIDDEN.0 != 0,
+            system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,
+            device: attributes & FILE_ATTRIBUTE_DEVICE.0 != 0,
+        })
+    }
 }
 
 const CF_HDROP: u32 = 15;
