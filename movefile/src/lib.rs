@@ -33,6 +33,7 @@ pub fn list_volumes() -> Result<Vec<Volume>, String> {
 
 #[derive(Debug, Clone)]
 pub struct FileAttribute {
+    pub directory: bool,
     pub read_only: bool,
     pub hidden: bool,
     pub system: bool,

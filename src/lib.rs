@@ -39,6 +39,8 @@ pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
     match movefile::get_file_attribute(&file_path) {
         Ok(att) => {
             let obj = cx.empty_object();
+            let a = cx.boolean(att.directory);
+            obj.set(&mut cx, "directory", a).unwrap();
             let a = cx.boolean(att.read_only);
             obj.set(&mut cx, "readOnly", a).unwrap();
             let a = cx.boolean(att.hidden);

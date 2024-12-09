@@ -74,6 +74,7 @@ pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, Strin
     }
 
     Ok(FileAttribute {
+        directory: attributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0,
         read_only: attributes & FILE_ATTRIBUTE_READONLY.0 != 0,
         hidden: attributes & FILE_ATTRIBUTE_HIDDEN.0 != 0,
         system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,

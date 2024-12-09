@@ -10,6 +10,7 @@ export type Volume = {
     volumeLabel: string;
 };
 export type FileAttribute = {
+    directory: boolean;
     readOnly: boolean;
     hidden: boolean;
     system: boolean;
