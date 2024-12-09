@@ -67,7 +67,8 @@ pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
 }
 
 pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
-    let attributes = unsafe { GetFileAttributesW(to_file_path_str(file_path)) };
+    let path = to_file_path_str(file_path);
+    let attributes = unsafe { GetFileAttributesW(path) };
 
     if attributes == INVALID_FILE_ATTRIBUTES {
         return Err(String::from("INVALID_FILE_ATTRIBUTES"));
