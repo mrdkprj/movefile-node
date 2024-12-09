@@ -56,6 +56,6 @@ export const getFileAttribute = (filePath: string): FileAttribute => {
     return MoveFile.get_file_attribute(filePath);
 };
 
-export const readUrlsFromClipboard = (windowHandle: number) => {
+export const readUrlsFromClipboard = (windowHandle: number): string[] => {
     return MoveFile.read_urls_from_clipboard(windowHandle);
 };

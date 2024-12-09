@@ -68,21 +68,17 @@ pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
 
 pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
     let attributes = unsafe { GetFileAttributesW(to_file_path_str(file_path)) };
+
     if attributes == INVALID_FILE_ATTRIBUTES {
-        Ok(FileAttribute {
-            read_only: false,
-            hidden: false,
-            system: false,
-            device: false,
-        })
-    } else {
-        Ok(FileAttribute {
-            read_only: attributes & FILE_ATTRIBUTE_READONLY.0 != 0,
-            hidden: attributes & FILE_ATTRIBUTE_HIDDEN.0 != 0,
-            system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,
-            device: attributes & FILE_ATTRIBUTE_DEVICE.0 != 0,
-        })
+        return Err(String::from("INVALID_FILE_ATTRIBUTES"));
     }
+
+    Ok(FileAttribute {
+        read_only: attributes & FILE_ATTRIBUTE_READONLY.0 != 0,
+        hidden: attributes & FILE_ATTRIBUTE_HIDDEN.0 != 0,
+        system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,
+        device: attributes & FILE_ATTRIBUTE_DEVICE.0 != 0,
+    })
 }
 
 const CF_HDROP: u32 = 15;
