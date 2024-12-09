@@ -1,8 +1,8 @@
 import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
-
+import os from "os";
 import path from "path";
 import fs from "fs";
-import { mv, cancel, mvSync, Progress, trash, mvBulk, reserveCancellable, listVolumes, getFileAttribute } from "../lib/index";
+import { mv, cancel, mvSync, Progress, trash, mvBulk, reserveCancellable, readUrlsFromClipboard } from "../lib/index";
 
 let id = -1;
 let sync = false;
@@ -21,13 +21,17 @@ const createWindow = () => {
         },
     });
 
-    console.log(new Date());
-    const x = listVolumes();
-    console.log(x);
-    const f = getFileAttribute("path");
-    console.log(f);
-    console.log(new Date());
     win.loadFile("index.html");
+
+    const hwndBuffer = win.getNativeWindowHandle();
+    let hwnd = 0;
+    if (os.endianness() == "LE") {
+        hwnd = hwndBuffer.readInt32LE();
+    } else {
+        hwnd = hwndBuffer.readInt32BE();
+    }
+    const x = readUrlsFromClipboard(hwnd);
+    console.log(x);
 };
 
 const handleSetTitle = async (_e: any, s: string, d: string) => {

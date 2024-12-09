@@ -42,3 +42,7 @@ pub struct FileAttribute {
 pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
     platform_impl::get_file_attribute(file_path)
 }
+
+pub fn read_urls_from_clipboard(window_handle: isize) -> Result<Vec<String>, String> {
+    platform_impl::read_urls_from_clipboard(window_handle)
+}

@@ -53,6 +53,21 @@ pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
     }
 }
 
+pub fn read_urls_from_clipboard(mut cx: FunctionContext) -> JsResult<JsArray> {
+    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
+    match movefile::read_urls_from_clipboard(window_handle as isize) {
+        Ok(urls) => {
+            let arr = cx.empty_array();
+            for (i, url) in urls.iter().enumerate() {
+                let a = cx.string(url);
+                arr.set(&mut cx, i as u32, a).unwrap();
+            }
+            Ok(arr)
+        }
+        Err(e) => cx.throw_error(e),
+    }
+}
+
 pub fn reserve_cancellable(mut cx: FunctionContext) -> JsResult<JsNumber> {
     Ok(cx.number(movefile::reserve_cancellable()))
 }
@@ -272,5 +287,6 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv_bulk", mv_bulk)?;
     cx.export_function("list_volumes", list_volumes)?;
     cx.export_function("get_file_attribute", get_file_attribute)?;
+    cx.export_function("read_urls_from_clipboard", read_urls_from_clipboard)?;
     Ok(())
 }

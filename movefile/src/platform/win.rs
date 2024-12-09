@@ -14,13 +14,14 @@ use std::{
 use windows::{
     core::{Error, HRESULT, PCWSTR},
     Win32::{
-        Foundation::{BOOL, HANDLE, MAX_PATH},
+        Foundation::{BOOL, HANDLE, HWND, MAX_PATH},
         Storage::FileSystem::*,
         System::{
             Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED},
+            DataExchange::{CloseClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard},
             WindowsProgramming::{COPY_FILE_ALLOW_DECRYPTED_DESTINATION, COPY_FILE_COPY_SYMLINK},
         },
-        UI::Shell::{FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, FOF_ALLOWUNDO},
+        UI::Shell::{DragQueryFileW, FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, FOF_ALLOWUNDO, HDROP},
     },
 };
 
@@ -76,6 +77,37 @@ pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, Strin
         system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,
         device: attributes & FILE_ATTRIBUTE_DEVICE.0 != 0,
     })
+}
+
+const CF_HDROP: u32 = 15;
+pub(crate) fn read_urls_from_clipboard(window_handle: isize) -> Result<Vec<String>, String> {
+    unsafe {
+        let mut urls = Vec::new();
+        if IsClipboardFormatAvailable(CF_HDROP).is_ok() {
+            OpenClipboard(HWND(window_handle as _)).map_err(|e| e.message())?;
+
+            if let Ok(handle) = GetClipboardData(CF_HDROP) {
+                let hdrop = HDROP(handle.0);
+                let count = DragQueryFileW(hdrop, 0xFFFFFFFF, None);
+                for i in 0..count {
+                    // Get the length of the file path
+                    let len = DragQueryFileW(hdrop, i, None) as usize;
+
+                    // Create a buffer to hold the file path
+                    let mut buffer = vec![0u16; len + 1];
+
+                    // Retrieve the file path
+                    DragQueryFileW(hdrop, i, Some(&mut buffer));
+
+                    urls.push(decode_wide(&buffer));
+                }
+            }
+
+            CloseClipboard().map_err(|e| e.message())?;
+        }
+
+        Ok(urls)
+    }
 }
 
 pub(crate) fn decode_wide(wide: &[u16]) -> String {
@@ -227,11 +259,15 @@ fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
 }
 
 fn to_file_path_str(orig_file_path: &str) -> PCWSTR {
-    PCWSTR::from_raw(encode_wide(orig_file_path).as_ptr())
+    let mut no_limit_string = String::from(r#"\\?\"#);
+    no_limit_string.push_str(orig_file_path);
+    PCWSTR::from_raw(encode_wide(no_limit_string).as_ptr())
 }
 
 fn to_file_path(orig_file_path: String) -> PCWSTR {
-    PCWSTR::from_raw(encode_wide(orig_file_path).as_ptr())
+    let mut no_limit_string = String::from(r#"\\?\"#);
+    no_limit_string.push_str(&orig_file_path);
+    PCWSTR::from_raw(encode_wide(no_limit_string).as_ptr())
 }
 
 unsafe extern "system" fn move_progress(
