@@ -66,18 +66,17 @@ pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
     Ok(volumes)
 }
 
-pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
-    // let path = to_file_path_str(file_path);
-    // let attributes = unsafe { GetFileAttributesW(path) };
+pub(crate) fn get_file_attribute(file_path: &str, retry_count: u8) -> Result<FileAttribute, String> {
+    let path = to_file_path_str(file_path);
+    let attributes = unsafe { GetFileAttributesW(path) };
 
-    // if attributes == INVALID_FILE_ATTRIBUTES {
-    //     return Err(String::from("INVALID_FILE_ATTRIBUTES"));
-    // }
-
-    let mut find_data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
-    let handle = unsafe { FindFirstFileW(to_file_path_str(file_path), &mut find_data).map_err(|e| e.message()) }?;
-    let attributes = find_data.dwFileAttributes;
-    unsafe { FindClose(handle).map_err(|e| e.message()) }?;
+    if attributes == INVALID_FILE_ATTRIBUTES {
+        if retry_count > 0 {
+            get_file_attribute(file_path, retry_count - 1).map_err(|e| e)?;
+        } else {
+            return Err(String::from("INVALID_FILE_ATTRIBUTES"));
+        }
+    }
 
     Ok(FileAttribute {
         directory: attributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0,

@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 import os from "os";
 import path from "path";
 import fs from "fs";
-import { mv, cancel, mvSync, Progress, trash, mvBulk, reserveCancellable, readUrlsFromClipboard } from "../lib/index";
+import { mv, cancel, mvSync, Progress, mvBulk, reserveCancellable, readUrlsFromClipboard, getFileAttribute } from "../lib/index";
 
 let id = -1;
 let sync = false;
@@ -81,8 +81,21 @@ const toggle = () => {
     }
 };
 
-const append = (_e: any, s: string) => {
-    trash(s);
+const append = () => {
+    const directory = "D:\\";
+
+    const allDirents = fs.readdirSync(directory, { withFileTypes: true });
+    const files = [];
+    allDirents
+        .filter((dirent) => {
+            try {
+                return !getFileAttribute(path.join(directory, dirent.name)).system;
+            } catch (ex: any) {
+                console.log(path.join(directory, dirent.name));
+                return true;
+            }
+        })
+        .forEach((file) => files.push(file));
 };
 
 const reload = async (_e: any, s: string[], d: string) => {
