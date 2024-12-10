@@ -66,16 +66,12 @@ pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
     Ok(volumes)
 }
 
-pub(crate) fn get_file_attribute(file_path: &str, retry_count: u8) -> Result<FileAttribute, String> {
+pub(crate) fn get_file_attribute(file_path: &str, _retry_count: u8) -> Result<FileAttribute, String> {
     let path = to_file_path_str(file_path);
     let attributes = unsafe { GetFileAttributesW(path) };
 
     if attributes == INVALID_FILE_ATTRIBUTES {
-        if retry_count > 0 {
-            get_file_attribute(file_path, retry_count - 1).map_err(|e| e)?;
-        } else {
-            return Err(String::from("INVALID_FILE_ATTRIBUTES"));
-        }
+        return Err(String::from("INVALID_FILE_ATTRIBUTES"));
     }
 
     Ok(FileAttribute {
@@ -85,6 +81,35 @@ pub(crate) fn get_file_attribute(file_path: &str, retry_count: u8) -> Result<Fil
         system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,
         device: attributes & FILE_ATTRIBUTE_DEVICE.0 != 0,
     })
+    // let handle = unsafe {
+    //     match CreateFileW(
+    //         path,
+    //         0, // Desired access: 0 for attributes only
+    //         FILE_SHARE_READ,
+    //         Some(std::ptr::null_mut()),
+    //         OPEN_EXISTING,
+    //         FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS,
+    //         HANDLE(std::ptr::null_mut()),
+    //     ) {
+    //         Ok(h) => h,
+    //         Err(e) => {
+    //             let error = windows::Win32::Foundation::GetLastError();
+    //             println!("Error code: {}", error.0);
+    //             println!("Error: {}", e.message());
+    //             let x = std::fs::metadata(file_path);
+    //             println!("{:?}", x.is_err());
+    //             return Err(String::from("errr"));
+    //         }
+    //     }
+
+    //     // .map_err(|e| e.message())
+    // };
+
+    // let mut data: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+
+    // unsafe { GetFileInformationByHandle(handle, &mut data).map_err(|e| e.message()) }?;
+    // let attributes = data.dwFileAttributes;
+    // unsafe { windows::Win32::Foundation::CloseHandle(handle).map_err(|e| e.message()) }?;
 }
 
 const CF_HDROP: u32 = 15;
@@ -266,16 +291,26 @@ fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
     string.as_ref().encode_wide().chain(std::iter::once(0)).collect()
 }
 
+fn add_extended_path_prefix(path: &str) -> String {
+    if path.len() >= MAX_PATH as usize {
+        if path.starts_with("\\\\") {
+            format!("\\\\?\\UNC\\{}", &path[2..])
+        } else {
+            format!("\\\\?\\{}", path)
+        }
+    } else {
+        path.to_string()
+    }
+}
+
 fn to_file_path_str(orig_file_path: &str) -> PCWSTR {
-    let mut no_limit_string = String::from(r#"\\?\"#);
-    no_limit_string.push_str(orig_file_path);
-    PCWSTR::from_raw(encode_wide(no_limit_string).as_ptr())
+    let path = add_extended_path_prefix(orig_file_path);
+    PCWSTR::from_raw(encode_wide(path).as_ptr())
 }
 
 fn to_file_path(orig_file_path: String) -> PCWSTR {
-    let mut no_limit_string = String::from(r#"\\?\"#);
-    no_limit_string.push_str(&orig_file_path);
-    PCWSTR::from_raw(encode_wide(no_limit_string).as_ptr())
+    let path = add_extended_path_prefix(&orig_file_path);
+    PCWSTR::from_raw(encode_wide(path).as_ptr())
 }
 
 unsafe extern "system" fn move_progress(
@@ -348,7 +383,6 @@ pub(crate) fn cancel(id: u32) -> bool {
             return true;
         }
     }
-
     false
 }
 
