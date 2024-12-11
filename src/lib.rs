@@ -49,6 +49,14 @@ pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
             obj.set(&mut cx, "system", a).unwrap();
             let a = cx.boolean(att.device);
             obj.set(&mut cx, "device", a).unwrap();
+            let a = cx.number(att.ctime);
+            obj.set(&mut cx, "ctime", a).unwrap();
+            let a = cx.number(att.mtime);
+            obj.set(&mut cx, "mtime", a).unwrap();
+            let a = cx.number(att.atime);
+            obj.set(&mut cx, "atime", a).unwrap();
+            let a = cx.number(att.size as f64);
+            obj.set(&mut cx, "size", a).unwrap();
             Ok(obj)
         }
         Err(e) => cx.throw_error(e),

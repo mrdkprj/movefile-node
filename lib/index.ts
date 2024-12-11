@@ -15,6 +15,10 @@ export type FileAttribute = {
     hidden: boolean;
     system: boolean;
     device: boolean;
+    atime: number;
+    ctime: number;
+    mtime: number;
+    size: number;
 };
 
 export const mv = async (sourceFile: string, destFile: string, callback?: ProgressCallback, id?: number) => {

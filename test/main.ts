@@ -87,9 +87,20 @@ const append = () => {
     const allDirents = fs.readdirSync(directory, { withFileTypes: true });
     const files = [];
     allDirents
-        .filter((dirent) => {
+        .filter((dirent, i) => {
             try {
-                return !getFileAttribute(path.join(directory, dirent.name)).system;
+                const x = getFileAttribute(path.join(directory, dirent.name));
+                if (i == 2) {
+                    const s = fs.statSync(path.join(directory, dirent.name));
+                    console.log(path.join(directory, dirent.name));
+                    console.log(s.atimeMs);
+                    console.log(x.atime);
+                    console.log(s.mtimeMs);
+                    console.log(x.mtime);
+                    console.log(s.size);
+                    console.log(x.size);
+                }
+                return !x.system;
             } catch (ex: any) {
                 console.log(path.join(directory, dirent.name));
                 return true;

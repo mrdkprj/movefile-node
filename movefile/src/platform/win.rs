@@ -67,12 +67,13 @@ pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
 }
 
 pub(crate) fn get_file_attribute(file_path: &str, _retry_count: u8) -> Result<FileAttribute, String> {
-    let path = to_file_path_str(file_path);
-    let attributes = unsafe { GetFileAttributesW(path) };
+    let wide = encode_wide(prefixed(file_path));
+    let path = PCWSTR::from_raw(wide.as_ptr());
 
-    if attributes == INVALID_FILE_ATTRIBUTES {
-        return Err(String::from("INVALID_FILE_ATTRIBUTES"));
-    }
+    let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
+    let handle = unsafe { FindFirstFileExW(path, FindExInfoBasic, &mut data as *mut _ as _, FindExSearchNameMatch, None, FIND_FIRST_EX_FLAGS(0)).map_err(|e| e.message()) }?;
+    let attributes = data.dwFileAttributes;
+    unsafe { FindClose(handle).map_err(|e| e.message()) }?;
 
     Ok(FileAttribute {
         directory: attributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0,
@@ -80,36 +81,19 @@ pub(crate) fn get_file_attribute(file_path: &str, _retry_count: u8) -> Result<Fi
         hidden: attributes & FILE_ATTRIBUTE_HIDDEN.0 != 0,
         system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,
         device: attributes & FILE_ATTRIBUTE_DEVICE.0 != 0,
+        ctime: to_msecs(data.ftCreationTime.dwLowDateTime, data.ftCreationTime.dwHighDateTime),
+        mtime: to_msecs(data.ftLastWriteTime.dwLowDateTime, data.ftLastWriteTime.dwHighDateTime),
+        atime: to_msecs(data.ftLastAccessTime.dwLowDateTime, data.ftLastAccessTime.dwHighDateTime),
+        size: (data.nFileSizeLow as u64) | ((data.nFileSizeHigh as u64) << 32),
     })
-    // let handle = unsafe {
-    //     match CreateFileW(
-    //         path,
-    //         0, // Desired access: 0 for attributes only
-    //         FILE_SHARE_READ,
-    //         Some(std::ptr::null_mut()),
-    //         OPEN_EXISTING,
-    //         FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS,
-    //         HANDLE(std::ptr::null_mut()),
-    //     ) {
-    //         Ok(h) => h,
-    //         Err(e) => {
-    //             let error = windows::Win32::Foundation::GetLastError();
-    //             println!("Error code: {}", error.0);
-    //             println!("Error: {}", e.message());
-    //             let x = std::fs::metadata(file_path);
-    //             println!("{:?}", x.is_err());
-    //             return Err(String::from("errr"));
-    //         }
-    //     }
+}
 
-    //     // .map_err(|e| e.message())
-    // };
+fn to_msecs(low: u32, high: u32) -> f64 {
+    let windows_epoch = 11644473600000.0; // FILETIME epoch (1601-01-01) to Unix epoch (1970-01-01) in milliseconds
+    let ticks = ((high as u64) << 32) | low as u64;
+    let milliseconds = ticks as f64 / 10_000.0; // FILETIME is in 100-nanosecond intervals
 
-    // let mut data: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
-
-    // unsafe { GetFileInformationByHandle(handle, &mut data).map_err(|e| e.message()) }?;
-    // let attributes = data.dwFileAttributes;
-    // unsafe { windows::Win32::Foundation::CloseHandle(handle).map_err(|e| e.message()) }?;
+    milliseconds - windows_epoch
 }
 
 const CF_HDROP: u32 = 15;
@@ -191,7 +175,16 @@ fn inner_mv(source_file: String, dest_file: String, callback: Option<&mut dyn Fn
     let dest_file_fallback = dest_file.clone();
 
     match unsafe {
-        CopyFileExW(to_file_path(source_file), to_file_path(dest_file), Some(move_progress), Some(data as _), Some(&mut BOOL(1)), COPY_FILE_ALLOW_DECRYPTED_DESTINATION | COPY_FILE_COPY_SYMLINK)
+        let source_wide = encode_wide(prefixed(&source_file));
+        let dest_wide = encode_wide(prefixed(&dest_file));
+        CopyFileExW(
+            PCWSTR::from_raw(source_wide.as_ptr()),
+            PCWSTR::from_raw(dest_wide.as_ptr()),
+            Some(move_progress),
+            Some(data as _),
+            Some(&mut BOOL(1)),
+            COPY_FILE_ALLOW_DECRYPTED_DESTINATION | COPY_FILE_COPY_SYMLINK,
+        )
     } {
         Ok(_) => after_copy(source_file_fallback, dest_file_fallback)?,
         Err(e) => handel_error(e, source_file_fallback, dest_file_fallback, false)?,
@@ -239,7 +232,16 @@ fn inner_mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&
         let dest_file_fallback = dest_file.clone();
 
         let done = match unsafe {
-            CopyFileExW(to_file_path_str(source_file), to_file_path_str(dest_file), Some(move_files_progress), Some(data as _), None, COPY_FILE_ALLOW_DECRYPTED_DESTINATION | COPY_FILE_COPY_SYMLINK)
+            let source_wide = encode_wide(prefixed(&source_file));
+            let dest_wide = encode_wide(prefixed(&dest_file));
+            CopyFileExW(
+                PCWSTR::from_raw(source_wide.as_ptr()),
+                PCWSTR::from_raw(dest_wide.as_ptr()),
+                Some(move_files_progress),
+                Some(data as _),
+                None,
+                COPY_FILE_ALLOW_DECRYPTED_DESTINATION | COPY_FILE_COPY_SYMLINK,
+            )
         } {
             Ok(_) => after_copy(source_file_fallback, dest_file_fallback)?,
             Err(e) => handel_error(e, source_file_fallback, dest_file_fallback, true)?,
@@ -254,16 +256,19 @@ fn inner_mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&
 }
 
 fn after_copy(source_file: String, _dest_file: String) -> Result<bool, String> {
-    unsafe { DeleteFileW(to_file_path_str(&source_file)) }.map_err(|e| e.message())?;
+    let source_wide = encode_wide(prefixed(&source_file));
+    unsafe { DeleteFileW(PCWSTR::from_raw(source_wide.as_ptr())) }.map_err(|e| e.message())?;
 
     Ok(true)
 }
 
 fn handel_error(e: Error, source: String, dest: String, treat_cancel_as_error: bool) -> Result<bool, String> {
-    let dest_file_exists = unsafe { GetFileAttributesW(to_file_path_str(&dest)) } != FILE_NO_EXISTS;
+    let dest_wide = encode_wide(prefixed(&dest));
+    let dest_file_exists = unsafe { GetFileAttributesW(PCWSTR::from_raw(dest_wide.as_ptr())) } != FILE_NO_EXISTS;
 
     if dest_file_exists {
-        unsafe { DeleteFileW(to_file_path_str(&dest)) }.map_err(|e| e.message())?;
+        let dest_wide = encode_wide(prefixed(&dest));
+        unsafe { DeleteFileW(PCWSTR::from_raw(dest_wide.as_ptr())) }.map_err(|e| e.message())?;
     }
 
     if e.code() != CANCEL_ERROR_CODE {
@@ -291,26 +296,17 @@ fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
     string.as_ref().encode_wide().chain(std::iter::once(0)).collect()
 }
 
-fn add_extended_path_prefix(path: &str) -> String {
+fn prefixed(path: &str) -> String {
     if path.len() >= MAX_PATH as usize {
         if path.starts_with("\\\\") {
             format!("\\\\?\\UNC\\{}", &path[2..])
         } else {
+            println!("yest long");
             format!("\\\\?\\{}", path)
         }
     } else {
         path.to_string()
     }
-}
-
-fn to_file_path_str(orig_file_path: &str) -> PCWSTR {
-    let path = add_extended_path_prefix(orig_file_path);
-    PCWSTR::from_raw(encode_wide(path).as_ptr())
-}
-
-fn to_file_path(orig_file_path: String) -> PCWSTR {
-    let path = add_extended_path_prefix(&orig_file_path);
-    PCWSTR::from_raw(encode_wide(path).as_ptr())
 }
 
 unsafe extern "system" fn move_progress(
@@ -392,7 +388,8 @@ pub(crate) fn trash(file: String) -> Result<(), String> {
 
         let op: IFileOperation = CoCreateInstance(&FileOperation, None, CLSCTX_ALL).map_err(|e| e.message())?;
         op.SetOperationFlags(FOF_ALLOWUNDO).map_err(|e| e.message())?;
-        let shell_item: IShellItem = SHCreateItemFromParsingName(to_file_path(file), None).map_err(|e| e.message())?;
+        let file_wide = encode_wide(prefixed(&file));
+        let shell_item: IShellItem = SHCreateItemFromParsingName(PCWSTR::from_raw(file_wide.as_ptr()), None).map_err(|e| e.message())?;
         op.DeleteItem(&shell_item, None).map_err(|e| e.message())?;
         op.PerformOperations().map_err(|e| e.message())?;
 

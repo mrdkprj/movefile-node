@@ -38,6 +38,10 @@ pub struct FileAttribute {
     pub hidden: bool,
     pub system: bool,
     pub device: bool,
+    pub ctime: f64,
+    pub mtime: f64,
+    pub atime: f64,
+    pub size: u64,
 }
 
 pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
