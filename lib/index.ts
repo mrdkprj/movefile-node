@@ -21,6 +21,11 @@ export type FileAttribute = {
     size: number;
 };
 
+export type ClipboardData = {
+    operation: "Copy" | "Move" | "Unknown";
+    urls: string[];
+};
+
 export const mv = async (sourceFile: string, destFile: string, callback?: ProgressCallback, id?: number) => {
     if (callback) {
         return await MoveFile.mv(sourceFile, destFile, callback, id);
@@ -61,6 +66,6 @@ export const getFileAttribute = (filePath: string): FileAttribute => {
     return MoveFile.get_file_attribute(filePath);
 };
 
-export const readUrlsFromClipboard = (windowHandle: number): string[] => {
+export const readUrlsFromClipboard = (windowHandle: number): ClipboardData => {
     return MoveFile.read_urls_from_clipboard(windowHandle);
 };

@@ -1,4 +1,4 @@
-use crate::{FileAttribute, Volume};
+use crate::{ClipboardData, FileAttribute, Operation, Volume};
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
@@ -14,14 +14,17 @@ use std::{
 use windows::{
     core::{Error, HRESULT, PCWSTR},
     Win32::{
-        Foundation::{BOOL, HANDLE, HWND, MAX_PATH},
+        Foundation::{HANDLE, HWND, MAX_PATH},
+        Globalization::lstrlenW,
         Storage::FileSystem::*,
         System::{
-            Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED},
-            DataExchange::{CloseClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard},
+            Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL},
+            DataExchange::{CloseClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW},
+            Memory::{GlobalLock, GlobalUnlock},
+            Ole::OleGetClipboard,
             WindowsProgramming::{COPY_FILE_ALLOW_DECRYPTED_DESTINATION, COPY_FILE_COPY_SYMLINK},
         },
-        UI::Shell::{DragQueryFileW, FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, FOF_ALLOWUNDO, HDROP},
+        UI::Shell::{DragQueryFileW, FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, CFSTR_PREFERREDDROPEFFECT, FOF_ALLOWUNDO, HDROP},
     },
 };
 
@@ -97,10 +100,21 @@ fn to_msecs(low: u32, high: u32) -> f64 {
 }
 
 const CF_HDROP: u32 = 15;
-pub(crate) fn read_urls_from_clipboard(window_handle: isize) -> Result<Vec<String>, String> {
+pub(crate) fn read_urls_from_clipboard(window_handle: isize) -> Result<ClipboardData, String> {
     unsafe {
-        let mut urls = Vec::new();
+        let mut data = ClipboardData {
+            operation: Operation::None,
+            urls: Vec::new(),
+        };
+
         if IsClipboardFormatAvailable(CF_HDROP).is_ok() {
+            let mut urls = Vec::new();
+            let operation = match get_preferred_drop_effect() {
+                Some(5) => Operation::Copy,
+                Some(2) => Operation::Move,
+                _ => Operation::None,
+            };
+
             OpenClipboard(HWND(window_handle as _)).map_err(|e| e.message())?;
 
             if let Ok(handle) = GetClipboardData(CF_HDROP) {
@@ -121,14 +135,49 @@ pub(crate) fn read_urls_from_clipboard(window_handle: isize) -> Result<Vec<Strin
             }
 
             CloseClipboard().map_err(|e| e.message())?;
+
+            data.operation = operation;
+            data.urls = urls;
         }
 
-        Ok(urls)
+        Ok(data)
     }
 }
 
+fn get_preferred_drop_effect() -> Option<u32> {
+    unsafe {
+        if let Ok(data_object) = OleGetClipboard() {
+            let cf_format = RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT);
+            if cf_format == 0 {
+                return None;
+            }
+
+            let format_etc = FORMATETC {
+                cfFormat: cf_format as u16,
+                ptd: std::ptr::null_mut(),
+                dwAspect: DVASPECT_CONTENT.0 as u32,
+                lindex: -1,
+                tymed: TYMED_HGLOBAL.0 as u32,
+            };
+
+            let medium = data_object.GetData(&format_etc).unwrap();
+            let h_global = medium.u.hGlobal;
+
+            if !h_global.is_invalid() {
+                let ptr = GlobalLock(h_global);
+                if !ptr.is_null() {
+                    let drop_effect = *(ptr as *const u32);
+                    let _ = GlobalUnlock(h_global);
+                    return Some(drop_effect);
+                }
+            }
+        }
+    }
+    None
+}
+
 pub(crate) fn decode_wide(wide: &[u16]) -> String {
-    let len = unsafe { windows::Win32::Globalization::lstrlenW(PCWSTR::from_raw(wide.as_ptr())) } as usize;
+    let len = unsafe { lstrlenW(PCWSTR::from_raw(wide.as_ptr())) } as usize;
     let w_str_slice = unsafe { std::slice::from_raw_parts(wide.as_ptr(), len) };
     String::from_utf16_lossy(w_str_slice)
 }
@@ -182,7 +231,7 @@ fn inner_mv(source_file: String, dest_file: String, callback: Option<&mut dyn Fn
             PCWSTR::from_raw(dest_wide.as_ptr()),
             Some(move_progress),
             Some(data as _),
-            Some(&mut BOOL(1)),
+            None,
             COPY_FILE_ALLOW_DECRYPTED_DESTINATION | COPY_FILE_COPY_SYMLINK,
         )
     } {

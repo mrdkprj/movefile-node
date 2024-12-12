@@ -35,22 +35,15 @@ const createWindow = () => {
 };
 
 const handleSetTitle = async (_e: any, s: string, d: string) => {
-    let id = reserveCancellable();
-    console.log(id);
-    const x = 10;
-    if (x > 0) {
-        return;
-    }
-    count = 0;
     console.log("from");
     try {
         if (fs.existsSync(s)) {
             console.log(s);
-            sync ? mvSync(s, d) : await mv(s, d, progressCb);
+            sync ? mvSync(s, d) : await mv(s, d);
             // sync ? mvSync(s, d) : await mv(s, d);
         } else {
             console.log(d);
-            sync ? mvSync(d, s) : await mv(d, s, progressCb);
+            sync ? mvSync(d, s) : await mv(d, s);
             // sync ? mvSync(d, s) : await mv(d, s);
         }
     } catch (ex: any) {

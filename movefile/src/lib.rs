@@ -48,6 +48,19 @@ pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
     platform_impl::get_file_attribute(file_path, 3)
 }
 
-pub fn read_urls_from_clipboard(window_handle: isize) -> Result<Vec<String>, String> {
+#[derive(Debug, Clone)]
+pub enum Operation {
+    None,
+    Copy,
+    Move,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClipboardData {
+    pub operation: Operation,
+    pub urls: Vec<String>,
+}
+
+pub fn read_urls_from_clipboard(window_handle: isize) -> Result<ClipboardData, String> {
     platform_impl::read_urls_from_clipboard(window_handle)
 }

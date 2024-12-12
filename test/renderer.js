@@ -20,10 +20,10 @@ window.onload = () => {
     // })
 
 
-    // document.getElementById("cancel").addEventListener("click", () => {
-    //         window.electronAPI.toggle();
+    document.getElementById("reload").addEventListener("click", () => {
+            window.electronAPI.setTitle("","");
 
-    // })
+    })
 
     document.getElementById("append").addEventListener("click", () => {
 

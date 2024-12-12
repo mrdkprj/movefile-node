@@ -1,3 +1,4 @@
+use movefile::Operation;
 use neon::{
     object::Object,
     prelude::{Context, FunctionContext, ModuleContext},
@@ -63,16 +64,24 @@ pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
     }
 }
 
-pub fn read_urls_from_clipboard(mut cx: FunctionContext) -> JsResult<JsArray> {
+pub fn read_urls_from_clipboard(mut cx: FunctionContext) -> JsResult<JsObject> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     match movefile::read_urls_from_clipboard(window_handle as isize) {
-        Ok(urls) => {
+        Ok(data) => {
+            let obj = cx.empty_object();
+            let a = match data.operation {
+                Operation::Copy => cx.string(String::from("Copy")),
+                Operation::Move => cx.string(String::from("Move")),
+                Operation::None => cx.string(String::from("Unknown")),
+            };
+            obj.set(&mut cx, "operation", a).unwrap();
             let arr = cx.empty_array();
-            for (i, url) in urls.iter().enumerate() {
+            for (i, url) in data.urls.iter().enumerate() {
                 let a = cx.string(url);
                 arr.set(&mut cx, i as u32, a).unwrap();
             }
-            Ok(arr)
+            obj.set(&mut cx, "urls", arr).unwrap();
+            Ok(obj)
         }
         Err(e) => cx.throw_error(e),
     }
