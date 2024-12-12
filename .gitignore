@@ -6,3 +6,4 @@ build/index.node
 .vscode
 cargo.log
 /test/main.js
+/test/test.ts

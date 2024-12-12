@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 import os from "os";
 import path from "path";
 import fs from "fs";
-import { mv, cancel, mvSync, Progress, mvBulk, reserveCancellable, readUrlsFromClipboard, getFileAttribute } from "../lib/index";
+import { mv, cancel, Progress, mvBulk, readUrlsFromClipboard, getFileAttribute } from "../lib/index";
 
 let id = -1;
 let sync = false;
@@ -39,12 +39,10 @@ const handleSetTitle = async (_e: any, s: string, d: string) => {
     try {
         if (fs.existsSync(s)) {
             console.log(s);
-            sync ? mvSync(s, d) : await mv(s, d);
-            // sync ? mvSync(s, d) : await mv(s, d);
+            sync ? await mv(s, d, progressCb) : await mv(s, d);
         } else {
             console.log(d);
-            sync ? mvSync(d, s) : await mv(d, s);
-            // sync ? mvSync(d, s) : await mv(d, s);
+            sync ? await mv(d, s, progressCb) : await mv(d, s);
         }
     } catch (ex: any) {
         console.log("error");
@@ -103,9 +101,8 @@ const append = () => {
 };
 
 const reload = async (_e: any, s: string[], d: string) => {
-    console.log("reload");
     try {
-        await mvBulk(s, d, progressCb);
+        sync ? await mvBulk(s, d, progressCb) : await mvBulk(s, d);
     } catch (ex: any) {
         dialog.showErrorBox("e", ex.message);
     }

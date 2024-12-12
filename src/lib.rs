@@ -92,7 +92,7 @@ pub fn reserve_cancellable(mut cx: FunctionContext) -> JsResult<JsNumber> {
 }
 
 pub fn mv(cx: FunctionContext) -> JsResult<JsPromise> {
-    if cx.len() > 3 {
+    if cx.len() > 2 {
         listen_mv(cx, false)
     } else {
         spawn_mv(cx, false)
@@ -100,7 +100,7 @@ pub fn mv(cx: FunctionContext) -> JsResult<JsPromise> {
 }
 
 pub fn mv_bulk(cx: FunctionContext) -> JsResult<JsPromise> {
-    if cx.len() > 3 {
+    if cx.len() > 2 {
         listen_mv(cx, true)
     } else {
         spawn_mv(cx, true)

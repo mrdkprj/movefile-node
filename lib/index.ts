@@ -30,7 +30,7 @@ export const mv = async (sourceFile: string, destFile: string, callback?: Progre
     if (callback) {
         return await MoveFile.mv(sourceFile, destFile, callback, id);
     } else {
-        return await MoveFile.mv(sourceFile, destFile, id);
+        return await MoveFile.mv(sourceFile, destFile);
     }
 };
 
@@ -38,7 +38,7 @@ export const mvBulk = async (sourceFiles: string[], destDir: string, callback?: 
     if (callback) {
         return await MoveFile.mv_bulk(sourceFiles, destDir, callback, id);
     } else {
-        return await MoveFile.mv_bulk(sourceFiles, destDir, id);
+        return await MoveFile.mv_bulk(sourceFiles, destDir);
     }
 };
 

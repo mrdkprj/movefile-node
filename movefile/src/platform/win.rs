@@ -16,13 +16,16 @@ use windows::{
     Win32::{
         Foundation::{HANDLE, HWND, MAX_PATH},
         Globalization::lstrlenW,
-        Storage::FileSystem::*,
+        Storage::FileSystem::{
+            DeleteFileW, FindClose, FindExInfoBasic, FindExSearchNameMatch, FindFirstFileExW, FindFirstVolumeW, FindNextVolumeW, FindVolumeClose, GetFileAttributesW, GetVolumeInformationW,
+            GetVolumePathNamesForVolumeNameW, MoveFileExW, MoveFileWithProgressW, FILE_ATTRIBUTE_DEVICE, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_READONLY,
+            FILE_ATTRIBUTE_SYSTEM, FIND_FIRST_EX_FLAGS, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, WIN32_FIND_DATAW,
+        },
         System::{
             Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL},
             DataExchange::{CloseClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW},
             Memory::{GlobalLock, GlobalUnlock},
             Ole::OleGetClipboard,
-            WindowsProgramming::{COPY_FILE_ALLOW_DECRYPTED_DESTINATION, COPY_FILE_COPY_SYMLINK},
         },
         UI::Shell::{DragQueryFileW, FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, CFSTR_PREFERREDDROPEFFECT, FOF_ALLOWUNDO, HDROP},
     },
@@ -206,37 +209,37 @@ pub(crate) fn mv(source_file: String, dest_file: String, callback: Option<&mut d
 }
 
 fn inner_mv(source_file: String, dest_file: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
-    let callback = if let Some(callback) = callback {
-        Some(callback)
-    } else {
-        None
-    };
-
-    let data = Box::into_raw(Box::new(ProgressData {
-        cancel_id,
-        callback,
-        total: 0,
-        prev: 0,
-        processed: 0,
-    }));
-
+    let source_wide = encode_wide(prefixed(&source_file));
+    let dest_wide = encode_wide(prefixed(&dest_file));
     let source_file_fallback = source_file.clone();
     let dest_file_fallback = dest_file.clone();
 
-    match unsafe {
-        let source_wide = encode_wide(prefixed(&source_file));
-        let dest_wide = encode_wide(prefixed(&dest_file));
-        CopyFileExW(
-            PCWSTR::from_raw(source_wide.as_ptr()),
-            PCWSTR::from_raw(dest_wide.as_ptr()),
-            Some(move_progress),
-            Some(data as _),
-            None,
-            COPY_FILE_ALLOW_DECRYPTED_DESTINATION | COPY_FILE_COPY_SYMLINK,
-        )
-    } {
-        Ok(_) => after_copy(source_file_fallback, dest_file_fallback)?,
-        Err(e) => handel_error(e, source_file_fallback, dest_file_fallback, false)?,
+    if let Some(callback) = callback {
+        let data = Box::into_raw(Box::new(ProgressData {
+            cancel_id,
+            callback: Some(callback),
+            total: 0,
+            prev: 0,
+            processed: 0,
+        }));
+
+        match unsafe {
+            MoveFileWithProgressW(
+                PCWSTR::from_raw(source_wide.as_ptr()),
+                PCWSTR::from_raw(dest_wide.as_ptr()),
+                Some(move_progress),
+                Some(data as _),
+                MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+            )
+        } {
+            Ok(_) => move_fallback(source_file_fallback, dest_file_fallback)?,
+            Err(e) => handel_error(e, source_file_fallback, false)?,
+        };
+    } else {
+        match unsafe { MoveFileExW(PCWSTR::from_raw(source_wide.as_ptr()), PCWSTR::from_raw(dest_wide.as_ptr()), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) } {
+            Ok(_) => move_fallback(source_file_fallback, dest_file_fallback)?,
+            Err(e) => handel_error(e, source_file_fallback, false)?,
+        };
     };
 
     Ok(())
@@ -254,74 +257,106 @@ fn inner_mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&
         return Err("Destination is file".to_string());
     }
 
-    let mut total: i64 = 0;
-    let mut dest_files: Vec<String> = Vec::new();
-    let owned_source_files = source_files.clone();
+    if let Some(callback) = callback {
+        let mut total: i64 = 0;
+        let mut dest_files: Vec<String> = Vec::new();
+        let owned_source_files = source_files.clone();
 
-    for source_file in source_files {
-        let metadata = fs::metadata(&source_file).unwrap();
-        total += metadata.len() as i64;
-        let path = Path::new(&source_file);
-        let name = path.file_name().unwrap();
-        let dest_file = dest_dir_path.join(name);
-        dest_files.push(dest_file.to_string_lossy().to_string());
-    }
+        for source_file in source_files {
+            let metadata = fs::metadata(&source_file).unwrap();
+            total += metadata.len() as i64;
+            let path = Path::new(&source_file);
+            let name = path.file_name().unwrap();
+            let dest_file = dest_dir_path.join(name);
+            dest_files.push(dest_file.to_string_lossy().to_string());
+        }
 
-    let data = Box::into_raw(Box::new(ProgressData {
-        cancel_id,
-        callback,
-        total,
-        prev: 0,
-        processed: 0,
-    }));
+        let data = Box::into_raw(Box::new(ProgressData {
+            cancel_id,
+            callback: Some(callback),
+            total,
+            prev: 0,
+            processed: 0,
+        }));
 
-    for (i, source_file) in owned_source_files.iter().enumerate() {
-        let dest_file = dest_files.get(i).unwrap();
-        let source_file_fallback = source_file.clone();
-        let dest_file_fallback = dest_file.clone();
+        for (i, source_file) in owned_source_files.iter().enumerate() {
+            let dest_file = dest_files.get(i).unwrap();
+            let source_file_fallback = source_file.clone();
+            let dest_file_fallback = dest_file.clone();
 
-        let done = match unsafe {
-            let source_wide = encode_wide(prefixed(&source_file));
-            let dest_wide = encode_wide(prefixed(&dest_file));
-            CopyFileExW(
-                PCWSTR::from_raw(source_wide.as_ptr()),
-                PCWSTR::from_raw(dest_wide.as_ptr()),
-                Some(move_files_progress),
-                Some(data as _),
-                None,
-                COPY_FILE_ALLOW_DECRYPTED_DESTINATION | COPY_FILE_COPY_SYMLINK,
-            )
-        } {
-            Ok(_) => after_copy(source_file_fallback, dest_file_fallback)?,
-            Err(e) => handel_error(e, source_file_fallback, dest_file_fallback, true)?,
-        };
+            let done = match unsafe {
+                let source_wide = encode_wide(prefixed(&source_file));
+                let dest_wide = encode_wide(prefixed(&dest_file));
+                MoveFileWithProgressW(
+                    PCWSTR::from_raw(source_wide.as_ptr()),
+                    PCWSTR::from_raw(dest_wide.as_ptr()),
+                    Some(move_files_progress),
+                    Some(data as _),
+                    MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+                )
+            } {
+                Ok(_) => move_fallback(source_file_fallback, dest_file_fallback)?,
+                Err(e) => handel_error(e, source_file_fallback, true)?,
+            };
 
-        if !done {
-            break;
+            if !done {
+                break;
+            }
+        }
+    } else {
+        let mut dest_files: Vec<String> = Vec::new();
+        let owned_source_files = source_files.clone();
+
+        for source_file in source_files {
+            let path = Path::new(&source_file);
+            let name = path.file_name().unwrap();
+            let dest_file = dest_dir_path.join(name);
+            dest_files.push(dest_file.to_string_lossy().to_string());
+        }
+
+        for (i, source_file) in owned_source_files.iter().enumerate() {
+            let dest_file = dest_files.get(i).unwrap();
+            let source_file_fallback = source_file.clone();
+            let dest_file_fallback = dest_file.clone();
+
+            let done = match unsafe {
+                let source_wide = encode_wide(prefixed(&source_file));
+                let dest_wide = encode_wide(prefixed(&dest_file));
+                MoveFileExW(PCWSTR::from_raw(source_wide.as_ptr()), PCWSTR::from_raw(dest_wide.as_ptr()), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
+            } {
+                Ok(_) => move_fallback(source_file_fallback, dest_file_fallback)?,
+                Err(e) => handel_error(e, source_file_fallback, true)?,
+            };
+
+            if !done {
+                break;
+            }
         }
     }
 
     Ok(())
 }
 
-fn after_copy(source_file: String, _dest_file: String) -> Result<bool, String> {
-    let source_wide = encode_wide(prefixed(&source_file));
-    unsafe { DeleteFileW(PCWSTR::from_raw(source_wide.as_ptr())) }.map_err(|e| e.message())?;
+fn move_fallback(source_file: String, dest_file: String) -> Result<bool, String> {
+    let source_wide = encode_wide(&source_file);
+    let dest_wide = encode_wide(&dest_file);
+
+    let source_file_exists = unsafe { GetFileAttributesW(PCWSTR::from_raw(source_wide.as_ptr())) } != FILE_NO_EXISTS;
+    let dest_file_exists = unsafe { GetFileAttributesW(PCWSTR::from_raw(dest_wide.as_ptr())) } != FILE_NO_EXISTS;
+    if source_file_exists && dest_file_exists {
+        unsafe { DeleteFileW(PCWSTR::from_raw(source_wide.as_ptr())) }.map_err(|e| e.message())?;
+    }
+
+    if source_file_exists && !dest_file_exists {
+        return Err("Failed to move file.".to_string());
+    }
 
     Ok(true)
 }
 
-fn handel_error(e: Error, source: String, dest: String, treat_cancel_as_error: bool) -> Result<bool, String> {
-    let dest_wide = encode_wide(prefixed(&dest));
-    let dest_file_exists = unsafe { GetFileAttributesW(PCWSTR::from_raw(dest_wide.as_ptr())) } != FILE_NO_EXISTS;
-
-    if dest_file_exists {
-        let dest_wide = encode_wide(prefixed(&dest));
-        unsafe { DeleteFileW(PCWSTR::from_raw(dest_wide.as_ptr())) }.map_err(|e| e.message())?;
-    }
-
+fn handel_error(e: Error, file: String, treat_cancel_as_error: bool) -> Result<bool, String> {
     if e.code() != CANCEL_ERROR_CODE {
-        return Err(format!("File: {}, Message: {}", source, e.message()));
+        return Err(format!("File: {}, Message: {}", file, e.message()));
     }
 
     if treat_cancel_as_error && e.code() == CANCEL_ERROR_CODE {
