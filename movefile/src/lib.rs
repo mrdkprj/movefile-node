@@ -64,3 +64,7 @@ pub struct ClipboardData {
 pub fn read_urls_from_clipboard(window_handle: isize) -> Result<ClipboardData, String> {
     platform_impl::read_urls_from_clipboard(window_handle)
 }
+
+pub fn write_urls_to_clipboard(window_handle: isize, file_paths: &[String], operation: Operation) -> Result<(), String> {
+    platform_impl::write_urls_to_clipboard(window_handle, file_paths, operation)
+}

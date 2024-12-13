@@ -14,7 +14,7 @@ use std::{
 use windows::{
     core::{Error, HRESULT, PCWSTR},
     Win32::{
-        Foundation::{HANDLE, HWND, MAX_PATH},
+        Foundation::{GlobalFree, HANDLE, HWND, MAX_PATH},
         Globalization::lstrlenW,
         Storage::FileSystem::{
             DeleteFileW, FindClose, FindExInfoBasic, FindExSearchNameMatch, FindFirstFileExW, FindFirstVolumeW, FindNextVolumeW, FindVolumeClose, GetFileAttributesW, GetVolumeInformationW,
@@ -23,11 +23,11 @@ use windows::{
         },
         System::{
             Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL},
-            DataExchange::{CloseClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW},
-            Memory::{GlobalLock, GlobalUnlock},
-            Ole::OleGetClipboard,
+            DataExchange::{CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW, SetClipboardData},
+            Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
+            Ole::{OleGetClipboard, DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_NONE},
         },
-        UI::Shell::{DragQueryFileW, FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, CFSTR_PREFERREDDROPEFFECT, FOF_ALLOWUNDO, HDROP},
+        UI::Shell::{DragQueryFileW, FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, CFSTR_PREFERREDDROPEFFECT, DROPFILES, FOF_ALLOWUNDO, HDROP},
     },
 };
 
@@ -104,79 +104,176 @@ fn to_msecs(low: u32, high: u32) -> f64 {
 
 const CF_HDROP: u32 = 15;
 pub(crate) fn read_urls_from_clipboard(window_handle: isize) -> Result<ClipboardData, String> {
-    unsafe {
-        let mut data = ClipboardData {
-            operation: Operation::None,
-            urls: Vec::new(),
-        };
+    let mut data = ClipboardData {
+        operation: Operation::None,
+        urls: Vec::new(),
+    };
 
-        if IsClipboardFormatAvailable(CF_HDROP).is_ok() {
-            let mut urls = Vec::new();
-            let operation = match get_preferred_drop_effect() {
-                Some(5) => Operation::Copy,
-                Some(2) => Operation::Move,
-                _ => Operation::None,
-            };
+    if unsafe { IsClipboardFormatAvailable(CF_HDROP).is_ok() } {
+        let mut urls = Vec::new();
+        let operation = get_preferred_drop_effect();
 
-            OpenClipboard(HWND(window_handle as _)).map_err(|e| e.message())?;
+        unsafe { OpenClipboard(HWND(window_handle as _)).map_err(|e| e.message()) }?;
 
-            if let Ok(handle) = GetClipboardData(CF_HDROP) {
-                let hdrop = HDROP(handle.0);
-                let count = DragQueryFileW(hdrop, 0xFFFFFFFF, None);
-                for i in 0..count {
-                    // Get the length of the file path
-                    let len = DragQueryFileW(hdrop, i, None) as usize;
+        if let Ok(handle) = unsafe { GetClipboardData(CF_HDROP) } {
+            let hdrop = HDROP(handle.0);
+            let count = unsafe { DragQueryFileW(hdrop, 0xFFFFFFFF, None) };
+            for i in 0..count {
+                // Get the length of the file path
+                let len = unsafe { DragQueryFileW(hdrop, i, None) } as usize;
 
-                    // Create a buffer to hold the file path
-                    let mut buffer = vec![0u16; len + 1];
+                // Create a buffer to hold the file path
+                let mut buffer = vec![0u16; len + 1];
 
-                    // Retrieve the file path
-                    DragQueryFileW(hdrop, i, Some(&mut buffer));
+                // Retrieve the file path
+                unsafe { DragQueryFileW(hdrop, i, Some(&mut buffer)) };
 
-                    urls.push(decode_wide(&buffer));
-                }
+                urls.push(decode_wide(&buffer));
             }
-
-            CloseClipboard().map_err(|e| e.message())?;
-
-            data.operation = operation;
-            data.urls = urls;
         }
 
-        Ok(data)
+        unsafe { CloseClipboard().map_err(|e| e.message()) }?;
+
+        data.operation = operation;
+        data.urls = urls;
+    }
+
+    Ok(data)
+}
+
+pub(crate) fn write_urls_to_clipboard(window_handle: isize, paths: &[String], operation: Operation) -> Result<(), String> {
+    unsafe {
+        let mut file_list = paths.join("\0");
+        // Append null to the last file
+        file_list.push('\0');
+        // Append null to the last
+        file_list.push('\0');
+
+        let mut total_size = std::mem::size_of::<u32>();
+        for path in paths {
+            let path_wide: Vec<u16> = encode_wide(path);
+            total_size += path_wide.len() * 2;
+        }
+        total_size += std::mem::size_of::<DROPFILES>();
+        // Double null terminator
+        total_size += 2;
+
+        // Calculate the size needed for the DROPFILES structure and file list
+        let dropfiles_size = std::mem::size_of::<DROPFILES>();
+        let file_list_size = file_list.len() * std::mem::size_of::<u16>();
+
+        let hglobal = GlobalAlloc(GMEM_MOVEABLE, total_size).map_err(|e| e.message())?;
+
+        // Lock the memory to write to it
+        let ptr = GlobalLock(hglobal) as *mut u8;
+        if ptr.is_null() {
+            GlobalFree(hglobal).map_err(|e| e.message())?;
+            return Err("Failed to lock memory".to_string());
+        }
+
+        let dropfiles = DROPFILES {
+            pFiles: dropfiles_size as u32,
+            pt: Default::default(),
+            fNC: false.into(),
+            fWide: true.into(),
+        };
+        std::ptr::copy_nonoverlapping(&dropfiles as *const _ as *const u8, ptr, dropfiles_size);
+
+        // Write the file list as wide characters (UTF-16)
+        let wide_file_list: Vec<u16> = file_list.encode_utf16().collect();
+        std::ptr::copy_nonoverlapping(wide_file_list.as_ptr() as *const u8, ptr.add(dropfiles_size), file_list_size);
+
+        let _ = GlobalUnlock(hglobal);
+
+        OpenClipboard(HWND(window_handle as _)).map_err(|e| e.message())?;
+        EmptyClipboard().map_err(|e| e.message())?;
+
+        if SetClipboardData(CF_HDROP, HANDLE(hglobal.0)).is_err() {
+            CloseClipboard().map_err(|e| e.message())?;
+            GlobalFree(hglobal).map_err(|e| e.message())?;
+            return Err("Failed to write clipboard".to_string());
+        }
+
+        if GlobalFree(hglobal).is_err() {
+            CloseClipboard().map_err(|e| e.message())?;
+            return Err("Failed to free memory".to_string());
+        }
+
+        let operation_value = match operation {
+            Operation::Copy => DROPEFFECT_COPY.0,
+            Operation::Move => DROPEFFECT_MOVE.0,
+            Operation::None => DROPEFFECT_NONE.0,
+        };
+
+        let hglobal_operation = GlobalAlloc(GMEM_MOVEABLE, std::mem::size_of::<u32>()).map_err(|e| e.message())?;
+
+        let ptr_operation = GlobalLock(hglobal_operation) as *mut u32;
+        if ptr_operation.is_null() {
+            GlobalFree(hglobal_operation).map_err(|e| e.message())?;
+            return Err("Failed to lock memory".to_string());
+        }
+
+        *ptr_operation = operation_value;
+
+        let _ = GlobalUnlock(hglobal_operation);
+
+        let custom_format = RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT);
+
+        if SetClipboardData(custom_format, HANDLE(hglobal_operation.0)).is_err() {
+            CloseClipboard().map_err(|e| e.message())?;
+            GlobalFree(hglobal_operation).map_err(|e| e.message())?;
+            return Err("Failed to write clipboard2".to_string());
+        }
+
+        if GlobalFree(hglobal).is_err() {
+            CloseClipboard().map_err(|e| e.message())?;
+            return Err("Failed to free memory".to_string());
+        }
+
+        CloseClipboard().map_err(|e| e.message())?;
+
+        Ok(())
     }
 }
 
-fn get_preferred_drop_effect() -> Option<u32> {
-    unsafe {
-        if let Ok(data_object) = OleGetClipboard() {
-            let cf_format = RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT);
-            if cf_format == 0 {
-                return None;
-            }
+fn get_preferred_drop_effect() -> Operation {
+    if let Ok(data_object) = unsafe { OleGetClipboard() } {
+        let cf_format = unsafe { RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT) };
+        if cf_format == 0 {
+            return Operation::None;
+        }
 
-            let format_etc = FORMATETC {
-                cfFormat: cf_format as u16,
-                ptd: std::ptr::null_mut(),
-                dwAspect: DVASPECT_CONTENT.0 as u32,
-                lindex: -1,
-                tymed: TYMED_HGLOBAL.0 as u32,
-            };
+        let format_etc = FORMATETC {
+            cfFormat: cf_format as u16,
+            ptd: std::ptr::null_mut(),
+            dwAspect: DVASPECT_CONTENT.0 as u32,
+            lindex: -1,
+            tymed: TYMED_HGLOBAL.0 as u32,
+        };
 
-            let medium = data_object.GetData(&format_etc).unwrap();
-            let h_global = medium.u.hGlobal;
+        if let Ok(medium) = unsafe { data_object.GetData(&format_etc) } {
+            let h_global = unsafe { medium.u.hGlobal };
 
             if !h_global.is_invalid() {
-                let ptr = GlobalLock(h_global);
+                let ptr = unsafe { GlobalLock(h_global) };
                 if !ptr.is_null() {
-                    let drop_effect = *(ptr as *const u32);
-                    let _ = GlobalUnlock(h_global);
-                    return Some(drop_effect);
+                    let drop_effect = unsafe { *(ptr as *const u32) };
+                    let _ = unsafe { GlobalUnlock(h_global) };
+                    if (drop_effect & DROPEFFECT_COPY.0) != 0 {
+                        return Operation::Copy;
+                    }
+
+                    if (drop_effect & DROPEFFECT_MOVE.0) != 0 {
+                        return Operation::Move;
+                    }
+
+                    return Operation::None;
                 }
             }
         }
     }
-    None
+
+    Operation::None
 }
 
 pub(crate) fn decode_wide(wide: &[u16]) -> String {

@@ -24,10 +24,10 @@ pub fn list_volumes(mut cx: FunctionContext) -> JsResult<JsArray> {
             for (i, volume) in volumes.iter().enumerate() {
                 let obj = cx.empty_object();
                 let a = cx.string(&volume.mount_point);
-                obj.set(&mut cx, "mountPoint", a).unwrap();
+                obj.set(&mut cx, "mountPoint", a)?;
                 let a = cx.string(&volume.volume_label);
-                obj.set(&mut cx, "volumeLabel", a).unwrap();
-                arr.set(&mut cx, i as u32, obj).unwrap();
+                obj.set(&mut cx, "volumeLabel", a)?;
+                arr.set(&mut cx, i as u32, obj)?;
             }
             Ok(arr)
         }
@@ -41,23 +41,23 @@ pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
         Ok(att) => {
             let obj = cx.empty_object();
             let a = cx.boolean(att.directory);
-            obj.set(&mut cx, "directory", a).unwrap();
+            obj.set(&mut cx, "directory", a)?;
             let a = cx.boolean(att.read_only);
-            obj.set(&mut cx, "readOnly", a).unwrap();
+            obj.set(&mut cx, "readOnly", a)?;
             let a = cx.boolean(att.hidden);
-            obj.set(&mut cx, "hidden", a).unwrap();
+            obj.set(&mut cx, "hidden", a)?;
             let a = cx.boolean(att.system);
-            obj.set(&mut cx, "system", a).unwrap();
+            obj.set(&mut cx, "system", a)?;
             let a = cx.boolean(att.device);
-            obj.set(&mut cx, "device", a).unwrap();
+            obj.set(&mut cx, "device", a)?;
             let a = cx.number(att.ctime);
-            obj.set(&mut cx, "ctime", a).unwrap();
+            obj.set(&mut cx, "ctime", a)?;
             let a = cx.number(att.mtime);
-            obj.set(&mut cx, "mtime", a).unwrap();
+            obj.set(&mut cx, "mtime", a)?;
             let a = cx.number(att.atime);
-            obj.set(&mut cx, "atime", a).unwrap();
+            obj.set(&mut cx, "atime", a)?;
             let a = cx.number(att.size as f64);
-            obj.set(&mut cx, "size", a).unwrap();
+            obj.set(&mut cx, "size", a)?;
             Ok(obj)
         }
         Err(e) => cx.throw_error(e),
@@ -72,19 +72,34 @@ pub fn read_urls_from_clipboard(mut cx: FunctionContext) -> JsResult<JsObject> {
             let a = match data.operation {
                 Operation::Copy => cx.string(String::from("Copy")),
                 Operation::Move => cx.string(String::from("Move")),
-                Operation::None => cx.string(String::from("Unknown")),
+                Operation::None => cx.string(String::from("None")),
             };
-            obj.set(&mut cx, "operation", a).unwrap();
+            obj.set(&mut cx, "operation", a)?;
             let arr = cx.empty_array();
             for (i, url) in data.urls.iter().enumerate() {
                 let a = cx.string(url);
-                arr.set(&mut cx, i as u32, a).unwrap();
+                arr.set(&mut cx, i as u32, a)?;
             }
-            obj.set(&mut cx, "urls", arr).unwrap();
+            obj.set(&mut cx, "urls", arr)?;
             Ok(obj)
         }
         Err(e) => cx.throw_error(e),
     }
+}
+
+pub fn write_urls_to_clipboard(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
+    let files: Vec<String> = cx.argument::<JsArray>(1)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect();
+    let operation_str = cx.argument::<JsString>(2)?.value(&mut cx);
+    let operation = match operation_str.as_str() {
+        "Copy" => Operation::Copy,
+        "Move" => Operation::Move,
+        _ => Operation::None,
+    };
+
+    movefile::write_urls_to_clipboard(window_handle as isize, files.as_slice(), operation).unwrap();
+
+    Ok(cx.undefined())
 }
 
 pub fn reserve_cancellable(mut cx: FunctionContext) -> JsResult<JsNumber> {
@@ -124,7 +139,7 @@ fn extract_optional_id(cx: &mut FunctionContext, index: usize) -> Option<u32> {
 
 fn spawn_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
     let source_files: Vec<String> = if bulk {
-        cx.argument::<neon::types::JsArray>(0)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect()
+        cx.argument::<JsArray>(0)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect()
     } else {
         vec![cx.argument::<JsString>(0)?.value(&mut cx)]
     };
@@ -307,5 +322,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("list_volumes", list_volumes)?;
     cx.export_function("get_file_attribute", get_file_attribute)?;
     cx.export_function("read_urls_from_clipboard", read_urls_from_clipboard)?;
+    cx.export_function("write_urls_to_clipboard", write_urls_to_clipboard)?;
+
     Ok(())
 }

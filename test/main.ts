@@ -2,9 +2,8 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 import os from "os";
 import path from "path";
 import fs from "fs";
-import { mv, cancel, Progress, mvBulk, readUrlsFromClipboard, getFileAttribute } from "../lib/index";
+import { mv, Progress, mvBulk, readUrlsFromClipboard, getFileAttribute, writeUrlsToClipboard } from "../lib/index";
 
-let id = -1;
 let sync = false;
 let win: BrowserWindow;
 
@@ -66,12 +65,6 @@ const progressCb = (progress: Progress) => {
     }
 };
 
-const toggle = () => {
-    if (id >= 0) {
-        cancel(id);
-    }
-};
-
 const append = () => {
     const directory = "D:\\";
 
@@ -106,6 +99,17 @@ const reload = async (_e: any, s: string[], d: string) => {
     } catch (ex: any) {
         dialog.showErrorBox("e", ex.message);
     }
+};
+
+const toggle = () => {
+    const hwndBuffer = win.getNativeWindowHandle();
+    let hwnd = 0;
+    if (os.endianness() == "LE") {
+        hwnd = hwndBuffer.readInt32LE();
+    } else {
+        hwnd = hwndBuffer.readInt32BE();
+    }
+    writeUrlsToClipboard(hwnd, ["C:\\DevProjects\\fs3.rs", "C:\\DevProjects\\fs2.rs"], "Move");
 };
 
 app.whenReady().then(async () => {

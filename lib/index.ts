@@ -21,8 +21,9 @@ export type FileAttribute = {
     size: number;
 };
 
+export type ClipboardOperation = "Copy" | "Move" | "None";
 export type ClipboardData = {
-    operation: "Copy" | "Move" | "Unknown";
+    operation: ClipboardOperation;
     urls: string[];
 };
 
@@ -68,4 +69,8 @@ export const getFileAttribute = (filePath: string): FileAttribute => {
 
 export const readUrlsFromClipboard = (windowHandle: number): ClipboardData => {
     return MoveFile.read_urls_from_clipboard(windowHandle);
+};
+
+export const writeUrlsToClipboard = (windowHandle: number, fullPaths: string[], operation: ClipboardOperation) => {
+    return MoveFile.write_urls_to_clipboard(windowHandle, fullPaths, operation);
 };
