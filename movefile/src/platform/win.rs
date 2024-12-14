@@ -14,7 +14,7 @@ use std::{
 use windows::{
     core::{Error, HRESULT, PCWSTR},
     Win32::{
-        Foundation::{GlobalFree, HANDLE, HWND, MAX_PATH},
+        Foundation::{GlobalFree, HANDLE, HGLOBAL, HWND, MAX_PATH},
         Globalization::lstrlenW,
         Storage::FileSystem::{
             DeleteFileW, FindClose, FindExInfoBasic, FindExSearchNameMatch, FindFirstFileExW, FindFirstVolumeW, FindNextVolumeW, FindVolumeClose, GetFileAttributesW, GetVolumeInformationW,
@@ -22,10 +22,10 @@ use windows::{
             FILE_ATTRIBUTE_SYSTEM, FIND_FIRST_EX_FLAGS, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, WIN32_FIND_DATAW,
         },
         System::{
-            Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL},
+            Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED},
             DataExchange::{CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW, SetClipboardData},
             Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
-            Ole::{OleGetClipboard, DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_NONE},
+            Ole::{DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_NONE},
         },
         UI::Shell::{DragQueryFileW, FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, CFSTR_PREFERREDDROPEFFECT, DROPFILES, FOF_ALLOWUNDO, HDROP},
     },
@@ -111,9 +111,10 @@ pub(crate) fn read_urls_from_clipboard(window_handle: isize) -> Result<Clipboard
 
     if unsafe { IsClipboardFormatAvailable(CF_HDROP).is_ok() } {
         let mut urls = Vec::new();
-        let operation = get_preferred_drop_effect();
 
         unsafe { OpenClipboard(HWND(window_handle as _)).map_err(|e| e.message()) }?;
+
+        let operation = get_preferred_drop_effect();
 
         if let Ok(handle) = unsafe { GetClipboardData(CF_HDROP) } {
             let hdrop = HDROP(handle.0);
@@ -167,7 +168,7 @@ pub(crate) fn write_urls_to_clipboard(window_handle: isize, paths: &[String], op
         // Lock the memory to write to it
         let ptr = GlobalLock(hglobal) as *mut u8;
         if ptr.is_null() {
-            GlobalFree(hglobal).map_err(|e| e.message())?;
+            global_free(hglobal)?;
             return Err("Failed to lock memory".to_string());
         }
 
@@ -190,13 +191,13 @@ pub(crate) fn write_urls_to_clipboard(window_handle: isize, paths: &[String], op
 
         if SetClipboardData(CF_HDROP, HANDLE(hglobal.0)).is_err() {
             CloseClipboard().map_err(|e| e.message())?;
-            GlobalFree(hglobal).map_err(|e| e.message())?;
+            global_free(hglobal)?;
             return Err("Failed to write clipboard".to_string());
         }
 
-        if GlobalFree(hglobal).is_err() {
+        if let Err(err) = global_free(hglobal) {
             CloseClipboard().map_err(|e| e.message())?;
-            return Err("Failed to free memory".to_string());
+            return Err(err);
         }
 
         let operation_value = match operation {
@@ -209,7 +210,7 @@ pub(crate) fn write_urls_to_clipboard(window_handle: isize, paths: &[String], op
 
         let ptr_operation = GlobalLock(hglobal_operation) as *mut u32;
         if ptr_operation.is_null() {
-            GlobalFree(hglobal_operation).map_err(|e| e.message())?;
+            global_free(hglobal_operation)?;
             return Err("Failed to lock memory".to_string());
         }
 
@@ -221,13 +222,13 @@ pub(crate) fn write_urls_to_clipboard(window_handle: isize, paths: &[String], op
 
         if SetClipboardData(custom_format, HANDLE(hglobal_operation.0)).is_err() {
             CloseClipboard().map_err(|e| e.message())?;
-            GlobalFree(hglobal_operation).map_err(|e| e.message())?;
+            global_free(hglobal_operation)?;
             return Err("Failed to write clipboard2".to_string());
         }
 
-        if GlobalFree(hglobal).is_err() {
+        if let Err(err) = global_free(hglobal) {
             CloseClipboard().map_err(|e| e.message())?;
-            return Err("Failed to free memory".to_string());
+            return Err(err);
         }
 
         CloseClipboard().map_err(|e| e.message())?;
@@ -236,39 +237,41 @@ pub(crate) fn write_urls_to_clipboard(window_handle: isize, paths: &[String], op
     }
 }
 
-fn get_preferred_drop_effect() -> Operation {
-    if let Ok(data_object) = unsafe { OleGetClipboard() } {
-        let cf_format = unsafe { RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT) };
-        if cf_format == 0 {
-            return Operation::None;
+fn global_free(h_global: HGLOBAL) -> Result<(), String> {
+    match unsafe { GlobalFree(h_global) } {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            if err.code() == HRESULT(0x00000000) {
+                Ok(())
+            } else {
+                Err(err.message())
+            }
         }
+    }
+}
 
-        let format_etc = FORMATETC {
-            cfFormat: cf_format as u16,
-            ptd: std::ptr::null_mut(),
-            dwAspect: DVASPECT_CONTENT.0 as u32,
-            lindex: -1,
-            tymed: TYMED_HGLOBAL.0 as u32,
-        };
+fn get_preferred_drop_effect() -> Operation {
+    let cf_format = unsafe { RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT) };
+    if cf_format == 0 {
+        return Operation::None;
+    }
 
-        if let Ok(medium) = unsafe { data_object.GetData(&format_etc) } {
-            let h_global = unsafe { medium.u.hGlobal };
-
-            if !h_global.is_invalid() {
-                let ptr = unsafe { GlobalLock(h_global) };
-                if !ptr.is_null() {
-                    let drop_effect = unsafe { *(ptr as *const u32) };
-                    let _ = unsafe { GlobalUnlock(h_global) };
-                    if (drop_effect & DROPEFFECT_COPY.0) != 0 {
-                        return Operation::Copy;
-                    }
-
-                    if (drop_effect & DROPEFFECT_MOVE.0) != 0 {
-                        return Operation::Move;
-                    }
-
-                    return Operation::None;
+    if unsafe { IsClipboardFormatAvailable(cf_format).is_ok() } {
+        if let Ok(handle) = unsafe { GetClipboardData(cf_format) } {
+            let h_global = windows::Win32::Foundation::HGLOBAL(handle.0);
+            let ptr = unsafe { GlobalLock(h_global) } as *const u32;
+            if !ptr.is_null() {
+                let drop_effect = unsafe { *ptr };
+                let _ = unsafe { GlobalUnlock(h_global) };
+                if (drop_effect & DROPEFFECT_COPY.0) != 0 {
+                    return Operation::Copy;
                 }
+
+                if (drop_effect & DROPEFFECT_MOVE.0) != 0 {
+                    return Operation::Move;
+                }
+
+                return Operation::None;
             }
         }
     }
