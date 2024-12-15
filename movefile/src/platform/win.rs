@@ -72,7 +72,7 @@ pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
     Ok(volumes)
 }
 
-pub(crate) fn get_file_attribute(file_path: &str, _retry_count: u8) -> Result<FileAttribute, String> {
+pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
     let wide = encode_wide(prefixed(file_path));
     let path = PCWSTR::from_raw(wide.as_ptr());
 
