@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 import os from "os";
 import path from "path";
 import fs from "fs";
-import { mv, Progress, mvBulk, readUrlsFromClipboard, getFileAttribute, writeUrlsToClipboard } from "../lib/index";
+import { mv, Progress, mvBulk, readUrlsFromClipboard, getFileAttribute, writeUrlsToClipboard, listVolumes } from "../lib/index";
 
 let sync = false;
 let win: BrowserWindow;
@@ -22,6 +22,8 @@ const createWindow = () => {
 
     win.loadFile("index.html");
 
+    const vols = listVolumes();
+    console.log(vols);
     const hwndBuffer = win.getNativeWindowHandle();
     let hwnd = 0;
     if (os.endianness() == "LE") {
@@ -66,7 +68,7 @@ const progressCb = (progress: Progress) => {
 };
 
 const append = () => {
-    const directory = "D:\\";
+    const directory = __dirname;
 
     const allDirents = fs.readdirSync(directory, { withFileTypes: true });
     const files = [];
@@ -74,6 +76,7 @@ const append = () => {
         .filter((dirent, i) => {
             try {
                 const x = getFileAttribute(path.join(directory, dirent.name));
+
                 if (i == 2) {
                     const s = fs.statSync(path.join(directory, dirent.name));
                     console.log(path.join(directory, dirent.name));

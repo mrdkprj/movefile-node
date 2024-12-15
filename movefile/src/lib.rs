@@ -45,7 +45,7 @@ pub struct FileAttribute {
 }
 
 pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
-    platform_impl::get_file_attribute(file_path, 3)
+    platform_impl::get_file_attribute(file_path)
 }
 
 #[derive(Debug, Clone)]

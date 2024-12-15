@@ -5,8 +5,8 @@ use gio::{
         translate::{from_glib_full, ToGlibPtr},
         Error,
     },
-    prelude::{CancellableExt, FileExt},
-    Cancellable, File, FileCopyFlags, IOErrorEnum,
+    prelude::{CancellableExt, DriveExt, FileExt, MountExt, VolumeExt, VolumeMonitorExt},
+    Cancellable, File, FileCopyFlags, FileQueryInfoFlags, FileType, IOErrorEnum,
 };
 use once_cell::sync::Lazy;
 use std::{
@@ -19,8 +19,77 @@ use std::{
     },
 };
 
+use crate::{ClipboardData, FileAttribute, Operation, Volume};
+
 static UUID: AtomicU32 = AtomicU32::new(0);
 static CANCELLABLES: Lazy<Mutex<HashMap<u32, Cancellable>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
+    gtk::init().unwrap();
+    let mut volumes = Vec::new();
+    let monitor = gio::VolumeMonitor::get();
+
+    for drive in monitor.connected_drives() {
+        let mount_point = if drive.has_volumes() {
+            drive.volumes().first().unwrap().get_mount().map(|m| m.default_location().to_string()).unwrap_or_else(|| String::new())
+        } else {
+            String::new()
+        };
+
+        let volume_label = drive.name().to_string();
+
+        volumes.push(Volume {
+            mount_point,
+            volume_label,
+        });
+    }
+
+    Ok(volumes)
+}
+
+pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
+    let file = File::for_parse_name(file_path);
+    let info = file.query_info("standard::*", FileQueryInfoFlags::NONE, Cancellable::NONE).unwrap();
+
+    Ok(FileAttribute {
+        directory: info.file_type() == FileType::Directory,
+        read_only: false,
+        hidden: info.is_hidden(),
+        system: info.file_type() == FileType::Special,
+        device: info.file_type() == FileType::Mountable,
+        ctime: info.creation_date_time().unwrap_or(gtk::glib::DateTime::now_local().unwrap()).to_unix() as f64,
+        mtime: info.modification_date_time().unwrap_or(gtk::glib::DateTime::now_local().unwrap()).to_unix() as f64,
+        atime: info.access_date_time().unwrap_or(gtk::glib::DateTime::now_local().unwrap()).to_unix() as f64,
+        size: info.size() as u64,
+    })
+}
+
+pub(crate) fn read_urls_from_clipboard(_window_handle: isize) -> Result<ClipboardData, String> {
+    let data = ClipboardData {
+        operation: Operation::None,
+        urls: Vec::new(),
+    };
+
+    if let Some(clipboard) = gtk::Clipboard::default(&gtk::gdk::Display::default().unwrap()) {
+        if clipboard.wait_is_uris_available() {
+            let urls: Vec<String> = clipboard.wait_for_uris().iter().map(|gs| gs.to_string()).collect();
+
+            return Ok(ClipboardData {
+                operation: Operation::None,
+                urls,
+            });
+        }
+    }
+
+    Ok(data)
+}
+
+pub(crate) fn write_urls_to_clipboard(_window_handle: isize, paths: &[String], _operation: Operation) -> Result<(), String> {
+    if let Some(_clipboard) = gtk::Clipboard::default(&gtk::gdk::Display::default().unwrap()) {
+        println!("{:?}", paths);
+    }
+    Ok(())
+}
 
 struct BulkProgressData<'a> {
     callback: Option<&'a mut dyn FnMut(i64, i64)>,
