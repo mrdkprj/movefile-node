@@ -112,6 +112,7 @@ const toggle = () => {
     } else {
         hwnd = hwndBuffer.readInt32BE();
     }
+
     writeUrlsToClipboard(hwnd, ["C:\\DevProjects\\fs3.rs", "C:\\DevProjects\\fs2.rs"], "Move");
 };
 
