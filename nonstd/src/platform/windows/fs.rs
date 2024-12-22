@@ -1,10 +1,9 @@
-use crate::{ClipboardData, FileAttribute, Operation, Volume};
+use crate::{FileAttribute, Volume};
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
     ffi::c_void,
     fs,
-    os::windows::ffi::OsStrExt,
     path::Path,
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -14,22 +13,18 @@ use std::{
 use windows::{
     core::{Error, HRESULT, PCWSTR},
     Win32::{
-        Foundation::{GlobalFree, HANDLE, HGLOBAL, HWND, MAX_PATH},
-        Globalization::lstrlenW,
+        Foundation::{HANDLE, HWND, MAX_PATH},
         Storage::FileSystem::{
             DeleteFileW, FindClose, FindExInfoBasic, FindExSearchNameMatch, FindFirstFileExW, FindFirstVolumeW, FindNextVolumeW, FindVolumeClose, GetFileAttributesW, GetVolumeInformationW,
             GetVolumePathNamesForVolumeNameW, MoveFileExW, MoveFileWithProgressW, FILE_ATTRIBUTE_DEVICE, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_READONLY,
             FILE_ATTRIBUTE_SYSTEM, FIND_FIRST_EX_FLAGS, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, WIN32_FIND_DATAW,
         },
-        System::{
-            Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED},
-            DataExchange::{CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW, SetClipboardData},
-            Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
-            Ole::{DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_NONE},
-        },
-        UI::Shell::{DragQueryFileW, FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, CFSTR_PREFERREDDROPEFFECT, DROPFILES, FOF_ALLOWUNDO, HDROP},
+        System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_APARTMENTTHREADED},
+        UI::Shell::{FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, ShellExecuteExW, FOF_ALLOWUNDO, SEE_MASK_INVOKEIDLIST, SHELLEXECUTEINFOW},
     },
 };
+
+use super::util::{decode_wide, encode_wide, prefixed};
 
 static UUID: AtomicU32 = AtomicU32::new(0);
 static CANCELLABLES: Lazy<Mutex<HashMap<u32, u32>>> = Lazy::new(|| Mutex::new(HashMap::new()));
@@ -102,187 +97,20 @@ fn to_msecs(low: u32, high: u32) -> f64 {
     milliseconds - windows_epoch
 }
 
-const CF_HDROP: u32 = 15;
-pub(crate) fn read_urls_from_clipboard(window_handle: isize) -> Result<ClipboardData, String> {
-    let mut data = ClipboardData {
-        operation: Operation::None,
-        urls: Vec::new(),
-    };
+pub(crate) fn open_file_property(window_handle: isize, file_path: String) -> Result<(), String> {
+    let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
 
-    if unsafe { IsClipboardFormatAvailable(CF_HDROP).is_ok() } {
-        let mut urls = Vec::new();
+    let mut info = SHELLEXECUTEINFOW::default();
+    info.cbSize = size_of::<SHELLEXECUTEINFOW>() as u32;
+    info.hwnd = HWND(window_handle as _);
+    let wide_verb = encode_wide("properties");
+    info.lpVerb = PCWSTR::from_raw(wide_verb.as_ptr());
+    info.fMask = SEE_MASK_INVOKEIDLIST;
+    let wide_path = encode_wide(file_path);
+    info.lpFile = PCWSTR::from_raw(wide_path.as_ptr());
+    unsafe { ShellExecuteExW(&mut info).map_err(|e| e.message()) }?;
 
-        unsafe { OpenClipboard(HWND(window_handle as _)).map_err(|e| e.message()) }?;
-
-        let operation = get_preferred_drop_effect();
-
-        if let Ok(handle) = unsafe { GetClipboardData(CF_HDROP) } {
-            let hdrop = HDROP(handle.0);
-            let count = unsafe { DragQueryFileW(hdrop, 0xFFFFFFFF, None) };
-            for i in 0..count {
-                // Get the length of the file path
-                let len = unsafe { DragQueryFileW(hdrop, i, None) } as usize;
-
-                // Create a buffer to hold the file path
-                let mut buffer = vec![0u16; len + 1];
-
-                // Retrieve the file path
-                unsafe { DragQueryFileW(hdrop, i, Some(&mut buffer)) };
-
-                urls.push(decode_wide(&buffer));
-            }
-        }
-
-        unsafe { CloseClipboard().map_err(|e| e.message()) }?;
-
-        data.operation = operation;
-        data.urls = urls;
-    }
-
-    Ok(data)
-}
-
-pub(crate) fn write_urls_to_clipboard(window_handle: isize, paths: &[String], operation: Operation) -> Result<(), String> {
-    unsafe {
-        let mut file_list = paths.join("\0");
-        // Append null to the last file
-        file_list.push('\0');
-        // Append null to the last
-        file_list.push('\0');
-
-        let mut total_size = std::mem::size_of::<u32>();
-        for path in paths {
-            let path_wide: Vec<u16> = encode_wide(path);
-            total_size += path_wide.len() * 2;
-        }
-        total_size += std::mem::size_of::<DROPFILES>();
-        // Double null terminator
-        total_size += 2;
-
-        // Calculate the size needed for the DROPFILES structure and file list
-        let dropfiles_size = std::mem::size_of::<DROPFILES>();
-        let file_list_size = file_list.len() * std::mem::size_of::<u16>();
-
-        let hglobal = GlobalAlloc(GMEM_MOVEABLE, total_size).map_err(|e| e.message())?;
-
-        // Lock the memory to write to it
-        let ptr = GlobalLock(hglobal) as *mut u8;
-        if ptr.is_null() {
-            global_free(hglobal)?;
-            return Err("Failed to lock memory".to_string());
-        }
-
-        let dropfiles = DROPFILES {
-            pFiles: dropfiles_size as u32,
-            pt: Default::default(),
-            fNC: false.into(),
-            fWide: true.into(),
-        };
-        std::ptr::copy_nonoverlapping(&dropfiles as *const _ as *const u8, ptr, dropfiles_size);
-
-        // Write the file list as wide characters (UTF-16)
-        let wide_file_list: Vec<u16> = file_list.encode_utf16().collect();
-        std::ptr::copy_nonoverlapping(wide_file_list.as_ptr() as *const u8, ptr.add(dropfiles_size), file_list_size);
-
-        let _ = GlobalUnlock(hglobal);
-
-        OpenClipboard(HWND(window_handle as _)).map_err(|e| e.message())?;
-        EmptyClipboard().map_err(|e| e.message())?;
-
-        if SetClipboardData(CF_HDROP, HANDLE(hglobal.0)).is_err() {
-            CloseClipboard().map_err(|e| e.message())?;
-            global_free(hglobal)?;
-            return Err("Failed to write clipboard".to_string());
-        }
-
-        if let Err(err) = global_free(hglobal) {
-            CloseClipboard().map_err(|e| e.message())?;
-            return Err(err);
-        }
-
-        let operation_value = match operation {
-            Operation::Copy => DROPEFFECT_COPY.0,
-            Operation::Move => DROPEFFECT_MOVE.0,
-            Operation::None => DROPEFFECT_NONE.0,
-        };
-
-        let hglobal_operation = GlobalAlloc(GMEM_MOVEABLE, std::mem::size_of::<u32>()).map_err(|e| e.message())?;
-
-        let ptr_operation = GlobalLock(hglobal_operation) as *mut u32;
-        if ptr_operation.is_null() {
-            global_free(hglobal_operation)?;
-            return Err("Failed to lock memory".to_string());
-        }
-
-        *ptr_operation = operation_value;
-
-        let _ = GlobalUnlock(hglobal_operation);
-
-        let custom_format = RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT);
-
-        if SetClipboardData(custom_format, HANDLE(hglobal_operation.0)).is_err() {
-            CloseClipboard().map_err(|e| e.message())?;
-            global_free(hglobal_operation)?;
-            return Err("Failed to write clipboard2".to_string());
-        }
-
-        if let Err(err) = global_free(hglobal) {
-            CloseClipboard().map_err(|e| e.message())?;
-            return Err(err);
-        }
-
-        CloseClipboard().map_err(|e| e.message())?;
-
-        Ok(())
-    }
-}
-
-fn global_free(h_global: HGLOBAL) -> Result<(), String> {
-    match unsafe { GlobalFree(h_global) } {
-        Ok(_) => Ok(()),
-        Err(err) => {
-            if err.code() == HRESULT(0x00000000) {
-                Ok(())
-            } else {
-                Err(err.message())
-            }
-        }
-    }
-}
-
-fn get_preferred_drop_effect() -> Operation {
-    let cf_format = unsafe { RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT) };
-    if cf_format == 0 {
-        return Operation::None;
-    }
-
-    if unsafe { IsClipboardFormatAvailable(cf_format).is_ok() } {
-        if let Ok(handle) = unsafe { GetClipboardData(cf_format) } {
-            let h_global = windows::Win32::Foundation::HGLOBAL(handle.0);
-            let ptr = unsafe { GlobalLock(h_global) } as *const u32;
-            if !ptr.is_null() {
-                let drop_effect = unsafe { *ptr };
-                let _ = unsafe { GlobalUnlock(h_global) };
-                if (drop_effect & DROPEFFECT_COPY.0) != 0 {
-                    return Operation::Copy;
-                }
-
-                if (drop_effect & DROPEFFECT_MOVE.0) != 0 {
-                    return Operation::Move;
-                }
-
-                return Operation::None;
-            }
-        }
-    }
-
-    Operation::None
-}
-
-pub(crate) fn decode_wide(wide: &[u16]) -> String {
-    let len = unsafe { lstrlenW(PCWSTR::from_raw(wide.as_ptr())) } as usize;
-    let w_str_slice = unsafe { std::slice::from_raw_parts(wide.as_ptr(), len) };
-    String::from_utf16_lossy(w_str_slice)
+    Ok(())
 }
 
 struct ProgressData<'a> {
@@ -476,23 +304,6 @@ fn clean_up(cancel_id: Option<u32>) {
     }
 }
 
-fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
-    string.as_ref().encode_wide().chain(std::iter::once(0)).collect()
-}
-
-fn prefixed(path: &str) -> String {
-    if path.len() >= MAX_PATH as usize {
-        if path.starts_with("\\\\") {
-            format!("\\\\?\\UNC\\{}", &path[2..])
-        } else {
-            println!("yest long");
-            format!("\\\\?\\{}", path)
-        }
-    } else {
-        path.to_string()
-    }
-}
-
 unsafe extern "system" fn move_progress(
     totalfilesize: i64,
     totalbytestransferred: i64,
@@ -576,8 +387,6 @@ pub(crate) fn trash(file: String) -> Result<(), String> {
         let shell_item: IShellItem = SHCreateItemFromParsingName(PCWSTR::from_raw(file_wide.as_ptr()), None).map_err(|e| e.message())?;
         op.DeleteItem(&shell_item, None).map_err(|e| e.message())?;
         op.PerformOperations().map_err(|e| e.message())?;
-
-        CoUninitialize();
     }
 
     Ok(())

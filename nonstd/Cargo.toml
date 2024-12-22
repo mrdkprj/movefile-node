@@ -1,11 +1,11 @@
 [package]
-name = "movefile"
+name = "nonstd"
 version = "0.1.0"
 edition = "2021"
 readme = "README.md"
 categories = ["util"]
 license = "MIT"
-repository = "https://github.com/mrdkprj/movefile"
+repository = "https://github.com/mrdkprj/nonstd"
 
 [package.metadata.docs.rs]
 targets = [
@@ -14,7 +14,7 @@ targets = [
 ]
 
 [lib]
-name = "movefile"
+name = "nonstd"
 path = "src/lib.rs"
 
 [dependencies]
@@ -34,7 +34,7 @@ features = [
   "Win32_Graphics_Gdi",
   "Win32_System_Com_StructuredStorage",
   "Win32_System_Memory",
-
+  "Win32_System_Registry",
 ]
 
 [target.'cfg(target_os = "linux")'.dependencies.gio]

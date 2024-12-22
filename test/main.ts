@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 import os from "os";
 import path from "path";
 import fs from "fs";
-import { mv, Progress, mvBulk, readUrlsFromClipboard, getFileAttribute, writeUrlsToClipboard, listVolumes } from "../lib/index";
+import * as nostd from "../lib/index";
 
 let sync = false;
 let win: BrowserWindow;
@@ -22,17 +22,20 @@ const createWindow = () => {
 
     win.loadFile("index.html");
 
-    const vols = listVolumes();
+    const vols = nostd.listVolumes();
     console.log(vols);
-    const hwndBuffer = win.getNativeWindowHandle();
-    let hwnd = 0;
-    if (os.endianness() == "LE") {
-        hwnd = hwndBuffer.readInt32LE();
-    } else {
-        hwnd = hwndBuffer.readInt32BE();
-    }
-    const x = readUrlsFromClipboard(hwnd);
-    console.log(x);
+    // const hwndBuffer = win.getNativeWindowHandle();
+    // let hwnd = 0;
+    // if (os.endianness() == "LE") {
+    //     hwnd = hwndBuffer.readInt32LE();
+    // } else {
+    //     hwnd = hwndBuffer.readInt32BE();
+    // }
+    // const x = readUrlsFromClipboard(hwnd);
+    // console.log(x);
+
+    // const y = readText(hwnd);
+    // console.log(y);
 };
 
 const handleSetTitle = async (_e: any, s: string, d: string) => {
@@ -40,10 +43,10 @@ const handleSetTitle = async (_e: any, s: string, d: string) => {
     try {
         if (fs.existsSync(s)) {
             console.log(s);
-            sync ? await mv(s, d, progressCb) : await mv(s, d);
+            sync ? await nostd.mv(s, d, progressCb) : await nostd.mv(s, d);
         } else {
             console.log(d);
-            sync ? await mv(d, s, progressCb) : await mv(d, s);
+            sync ? await nostd.mv(d, s, progressCb) : await nostd.mv(d, s);
         }
     } catch (ex: any) {
         console.log("error");
@@ -54,7 +57,7 @@ const handleSetTitle = async (_e: any, s: string, d: string) => {
     // cancel(id);
 };
 let count = 0;
-const progressCb = (progress: Progress) => {
+const progressCb = (progress: nostd.Progress) => {
     count++;
 
     // if (count > 3) {
@@ -75,7 +78,7 @@ const append = () => {
     allDirents
         .filter((dirent, i) => {
             try {
-                const x = getFileAttribute(path.join(directory, dirent.name));
+                const x = nostd.getFileAttribute(path.join(directory, dirent.name));
 
                 if (i == 2) {
                     const s = fs.statSync(path.join(directory, dirent.name));
@@ -98,7 +101,7 @@ const append = () => {
 
 const reload = async (_e: any, s: string[], d: string) => {
     try {
-        sync ? await mvBulk(s, d, progressCb) : await mvBulk(s, d);
+        sync ? await nostd.mvBulk(s, d, progressCb) : await nostd.mvBulk(s, d);
     } catch (ex: any) {
         dialog.showErrorBox("e", ex.message);
     }
@@ -112,7 +115,18 @@ const toggle = () => {
     } else {
         hwnd = hwndBuffer.readInt32BE();
     }
-    writeUrlsToClipboard(hwnd, ["C:\\DevProjects\\fs3.rs", "C:\\DevProjects\\fs2.rs"], "Move");
+    nostd.writeUrlsToClipboard(hwnd, ["C:\\DevProjects\\fs3.rs", "C:\\DevProjects\\fs2.rs"], "Move");
+};
+
+const open = () => {
+    const hwndBuffer = win.getNativeWindowHandle();
+    let hwnd = 0;
+    if (os.endianness() == "LE") {
+        hwnd = hwndBuffer.readInt32LE();
+    } else {
+        hwnd = hwndBuffer.readInt32BE();
+    }
+    nostd.openFileProperty(hwnd, "C:\\DevProjects\\fs.rs");
 };
 
 app.whenReady().then(async () => {
@@ -121,6 +135,7 @@ app.whenReady().then(async () => {
     ipcMain.on("toggle", toggle);
     ipcMain.on("append", append);
     ipcMain.on("reload", reload);
+    ipcMain.on("open", open);
 });
 
 app.on("window-all-closed", () => {

@@ -688,22 +688,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "movefile"
-version = "0.1.0"
-dependencies = [
- "gio",
- "gtk",
- "once_cell",
- "windows",
-]
-
-[[package]]
 name = "movefile_node"
 version = "0.1.0"
 dependencies = [
  "async-std",
- "movefile",
  "neon",
+ "nonstd",
  "once_cell",
 ]
 
@@ -731,6 +721,16 @@ dependencies = [
  "quote",
  "syn 2.0.81",
  "syn-mid",
+]
+
+[[package]]
+name = "nonstd"
+version = "0.1.0"
+dependencies = [
+ "gio",
+ "gtk",
+ "once_cell",
+ "windows",
 ]
 
 [[package]]

@@ -11,7 +11,7 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-movefile = "0.1.0"
+nonstd = "0.1.0"
 once_cell = "1.19.0"
 async-std = "1.13.0"
 
@@ -19,8 +19,7 @@ async-std = "1.13.0"
 version = "1"
 
 [patch.crates-io]
-#movefile = { git = "https://github.com/mrdkprj/movefile.git" }
-movefile = { path = "./movefile" }
+nonstd = { path = "./nonstd" }
 
 [profile.release]
 opt-level = "s"

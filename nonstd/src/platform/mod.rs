@@ -2,5 +2,5 @@
 #[path = "gio.rs"]
 pub(crate) mod platform_impl;
 #[cfg(target_os = "windows")]
-#[path = "win.rs"]
+#[path = "./windows/win.rs"]
 pub(crate) mod platform_impl;

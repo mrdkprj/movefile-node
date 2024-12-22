@@ -40,6 +40,11 @@ window.onload = () => {
         window.electronAPI.toggle("","");
 
     })
+
+    document.getElementById("open").addEventListener("click", () => {
+        window.electronAPI.open();
+
+    })
     // document.getElementById("multi").addEventListener("click", () => {
     //     if(navigator.userAgent.includes("Linux")) {
     //         window.electronAPI.reload(["/mnt/d/2023.mp4","/mnt/d/2024.mp4"], "/mnt/c/DevProjects");

@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggle: () => ipcRenderer.send('toggle'),
   append: (s) => ipcRenderer.send('append', s),
   reload: (s,d) => ipcRenderer.send('reload', s, d),
+  open:()  => ipcRenderer.send('open'),
   onMyEventName: (callback) => ipcRenderer.on('progress', (_e, ...args) => callback(args)),
 })

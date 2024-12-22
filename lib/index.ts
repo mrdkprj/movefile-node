@@ -67,6 +67,18 @@ export const getFileAttribute = (filePath: string): FileAttribute => {
     return MoveFile.get_file_attribute(filePath);
 };
 
+export const openFileProperty = (windowHandle: number, filePath: string) => {
+    return MoveFile.open_file_property(windowHandle, filePath);
+};
+
+export const readText = (windowHandle: number): string => {
+    return MoveFile.read_text(windowHandle);
+};
+
+export const writeText = (windowHandle: number, text: string) => {
+    return MoveFile.write_text(windowHandle, text);
+};
+
 export const readUrlsFromClipboard = (windowHandle: number): ClipboardData => {
     return MoveFile.read_urls_from_clipboard(windowHandle);
 };
