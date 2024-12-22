@@ -1,4 +1,3 @@
-use super::util::{decode_wide, encode_wide};
 use crate::{ClipboardData, Operation};
 use windows::{
     core::HRESULT,
@@ -13,11 +12,13 @@ use windows::{
     },
 };
 
-pub(crate) fn is_text_availabel() -> bool {
+use super::util::{decode_wide, encode_wide};
+
+pub fn is_text_availabel() -> bool {
     unsafe { IsClipboardFormatAvailable(CF_TEXT.0 as u32).is_ok() }
 }
 
-pub(crate) fn read_text(window_handle: isize) -> Result<String, String> {
+pub fn read_text(window_handle: isize) -> Result<String, String> {
     if !is_text_availabel() {
         return Ok(String::new());
     }
@@ -46,7 +47,7 @@ pub(crate) fn read_text(window_handle: isize) -> Result<String, String> {
     Ok(text)
 }
 
-pub(crate) fn write_text(window_handle: isize, text: String) -> Result<(), String> {
+pub fn write_text(window_handle: isize, text: String) -> Result<(), String> {
     unsafe { OpenClipboard(HWND(window_handle as _)).map_err(|e| e.message()) }?;
 
     unsafe { EmptyClipboard().map_err(|e| e.message()) }?;
@@ -74,11 +75,11 @@ pub(crate) fn write_text(window_handle: isize, text: String) -> Result<(), Strin
     Ok(())
 }
 
-pub(crate) fn is_uris_available() -> bool {
+pub fn is_uris_available() -> bool {
     unsafe { IsClipboardFormatAvailable(CF_HDROP.0 as u32).is_ok() }
 }
 
-pub(crate) fn read_uris(window_handle: isize) -> Result<ClipboardData, String> {
+pub fn read_uris(window_handle: isize) -> Result<ClipboardData, String> {
     let mut data = ClipboardData {
         operation: Operation::None,
         urls: Vec::new(),
@@ -119,7 +120,7 @@ pub(crate) fn read_uris(window_handle: isize) -> Result<ClipboardData, String> {
     Ok(data)
 }
 
-pub(crate) fn write_uris(window_handle: isize, paths: &[String], operation: Operation) -> Result<(), String> {
+pub fn write_uris(window_handle: isize, paths: &[String], operation: Operation) -> Result<(), String> {
     unsafe {
         let mut file_list = paths.join("\0");
         // Append null to the last file

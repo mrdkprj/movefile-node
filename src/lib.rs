@@ -18,7 +18,7 @@ static UUID: AtomicU32 = AtomicU32::new(0);
 static CALLBACKS: Lazy<Mutex<HashMap<u32, neon::handle::Root<JsFunction>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn list_volumes(mut cx: FunctionContext) -> JsResult<JsArray> {
-    match nonstd::list_volumes() {
+    match nonstd::fs::list_volumes() {
         Ok(volumes) => {
             let arr = cx.empty_array();
             for (i, volume) in volumes.iter().enumerate() {
@@ -37,7 +37,7 @@ pub fn list_volumes(mut cx: FunctionContext) -> JsResult<JsArray> {
 
 pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    match nonstd::get_file_attribute(&file_path) {
+    match nonstd::fs::get_file_attribute(&file_path) {
         Ok(att) => {
             let obj = cx.empty_object();
             let a = cx.boolean(att.directory);
@@ -66,7 +66,7 @@ pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
 
 pub fn read_text(mut cx: FunctionContext) -> JsResult<JsString> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    match nonstd::read_text(window_handle as isize) {
+    match nonstd::clipboard::read_text(window_handle as isize) {
         Ok(text) => Ok(cx.string(text)),
         Err(e) => cx.throw_error(e),
     }
@@ -75,13 +75,13 @@ pub fn read_text(mut cx: FunctionContext) -> JsResult<JsString> {
 pub fn write_text(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     let text = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::write_text(window_handle as isize, text);
+    let _ = nonstd::clipboard::write_text(window_handle as isize, text);
     Ok(cx.undefined())
 }
 
 pub fn read_urls_from_clipboard(mut cx: FunctionContext) -> JsResult<JsObject> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    match nonstd::read_urls_from_clipboard(window_handle as isize) {
+    match nonstd::clipboard::read_uris(window_handle as isize) {
         Ok(data) => {
             let obj = cx.empty_object();
             let a = match data.operation {
@@ -112,13 +112,13 @@ pub fn write_urls_to_clipboard(mut cx: FunctionContext) -> JsResult<JsUndefined>
         _ => Operation::None,
     };
 
-    nonstd::write_urls_to_clipboard(window_handle as isize, files.as_slice(), operation).unwrap();
+    nonstd::clipboard::write_uris(window_handle as isize, files.as_slice(), operation).unwrap();
 
     Ok(cx.undefined())
 }
 
 pub fn reserve_cancellable(mut cx: FunctionContext) -> JsResult<JsNumber> {
-    Ok(cx.number(nonstd::reserve_cancellable()))
+    Ok(cx.number(nonstd::fs::reserve_cancellable()))
 }
 
 pub fn mv(cx: FunctionContext) -> JsResult<JsPromise> {
@@ -166,7 +166,7 @@ fn spawn_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
 
     if bulk {
         async_std::task::spawn(async move {
-            let result = nonstd::mv_bulk(source_files, dest_file, None, id);
+            let result = nonstd::fs::mv_bulk(source_files, dest_file, None, id);
             deferred.settle_with(&channel, |mut cx| match result {
                 Ok(_) => Ok(cx.undefined()),
                 Err(e) => cx.throw_error(e),
@@ -174,7 +174,7 @@ fn spawn_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
         });
     } else {
         async_std::task::spawn(async move {
-            let result = nonstd::mv(source_files.first().unwrap().to_string(), dest_file, None, id);
+            let result = nonstd::fs::mv(source_files.first().unwrap().to_string(), dest_file, None, id);
             deferred.settle_with(&channel, |mut cx| match result {
                 Ok(_) => Ok(cx.undefined()),
                 Err(e) => cx.throw_error(e),
@@ -204,7 +204,7 @@ fn listen_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
 
     if bulk {
         async_std::task::spawn(async move {
-            let result = nonstd::mv_bulk(
+            let result = nonstd::fs::mv_bulk(
                 source_files,
                 dest_file,
                 Some(&mut |a, b| {
@@ -246,7 +246,7 @@ fn listen_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
         });
     } else {
         async_std::task::spawn(async move {
-            let result = nonstd::mv(
+            let result = nonstd::fs::mv(
                 source_files.first().unwrap().to_string(),
                 dest_file,
                 Some(&mut |a, b| {
@@ -295,7 +295,7 @@ pub fn mv_sync(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let source_file = cx.argument::<JsString>(0)?.value(&mut cx);
     let dest_file = cx.argument::<JsString>(1)?.value(&mut cx);
 
-    let _ = nonstd::mv(source_file, dest_file, None, None);
+    let _ = nonstd::fs::mv(source_file, dest_file, None, None);
 
     Ok(cx.undefined())
 }
@@ -308,7 +308,7 @@ pub fn cancel(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     }
 
     let id = id as u32;
-    let result = nonstd::cancel(id);
+    let result = nonstd::fs::cancel(id);
 
     if let Ok(mut callbacks) = CALLBACKS.try_lock() {
         if callbacks.get(&id).is_some() {
@@ -321,14 +321,14 @@ pub fn cancel(mut cx: FunctionContext) -> JsResult<JsBoolean> {
 
 pub fn trash(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let source_file = cx.argument::<JsString>(0)?.value(&mut cx);
-    let _ = nonstd::trash(source_file);
+    let _ = nonstd::fs::trash(source_file);
     Ok(cx.undefined())
 }
 
 pub fn open_file_property(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     let source_file = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::open_file_property(window_handle as isize, source_file);
+    let _ = nonstd::fs::open_file_property(window_handle as isize, source_file);
     Ok(cx.undefined())
 }
 

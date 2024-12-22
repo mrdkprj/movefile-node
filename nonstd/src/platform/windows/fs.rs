@@ -32,7 +32,7 @@ const PROGRESS_CANCEL: u32 = 1;
 const FILE_NO_EXISTS: u32 = 4294967295;
 const CANCEL_ERROR_CODE: HRESULT = HRESULT::from_win32(1235);
 
-pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
+pub fn list_volumes() -> Result<Vec<Volume>, String> {
     let mut volumes: Vec<Volume> = Vec::new();
 
     let mut volume_name = vec![0u16; MAX_PATH as usize];
@@ -67,7 +67,7 @@ pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
     Ok(volumes)
 }
 
-pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
+pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
     let wide = encode_wide(prefixed(file_path));
     let path = PCWSTR::from_raw(wide.as_ptr());
 
@@ -97,7 +97,23 @@ fn to_msecs(low: u32, high: u32) -> f64 {
     milliseconds - windows_epoch
 }
 
-pub(crate) fn open_file_property(window_handle: isize, file_path: String) -> Result<(), String> {
+pub fn open_path(window_handle: isize, file_path: String) -> Result<(), String> {
+    let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+
+    let mut info = SHELLEXECUTEINFOW::default();
+    info.cbSize = size_of::<SHELLEXECUTEINFOW>() as u32;
+    info.hwnd = HWND(window_handle as _);
+    let wide_verb = encode_wide("open");
+    info.lpVerb = PCWSTR::from_raw(wide_verb.as_ptr());
+    info.fMask = SEE_MASK_INVOKEIDLIST;
+    let wide_path = encode_wide(file_path);
+    info.lpFile = PCWSTR::from_raw(wide_path.as_ptr());
+    unsafe { ShellExecuteExW(&mut info).map_err(|e| e.message()) }?;
+
+    Ok(())
+}
+
+pub fn open_file_property(window_handle: isize, file_path: String) -> Result<(), String> {
     let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
 
     let mut info = SHELLEXECUTEINFOW::default();
@@ -121,7 +137,7 @@ struct ProgressData<'a> {
     processed: i64,
 }
 
-pub(crate) fn reserve_cancellable() -> u32 {
+pub fn reserve_cancellable() -> u32 {
     let id = UUID.fetch_add(1, Ordering::Relaxed);
 
     let mut tokens = CANCELLABLES.lock().unwrap();
@@ -130,7 +146,7 @@ pub(crate) fn reserve_cancellable() -> u32 {
     id
 }
 
-pub(crate) fn mv(source_file: String, dest_file: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+pub fn mv(source_file: String, dest_file: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let result = inner_mv(source_file, dest_file, callback, cancel_id);
     clean_up(cancel_id);
     result
@@ -173,7 +189,7 @@ fn inner_mv(source_file: String, dest_file: String, callback: Option<&mut dyn Fn
     Ok(())
 }
 
-pub(crate) fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let result = inner_mv_bulk(source_files, dest_dir, callback, cancel_id);
     clean_up(cancel_id);
     result
@@ -367,7 +383,7 @@ unsafe extern "system" fn move_files_progress(
     0
 }
 
-pub(crate) fn cancel(id: u32) -> bool {
+pub fn cancel(id: u32) -> bool {
     if let Ok(mut tokens) = CANCELLABLES.try_lock() {
         if let Some(token) = tokens.get_mut(&id) {
             *token = PROGRESS_CANCEL;
@@ -377,7 +393,7 @@ pub(crate) fn cancel(id: u32) -> bool {
     false
 }
 
-pub(crate) fn trash(file: String) -> Result<(), String> {
+pub fn trash(file: String) -> Result<(), String> {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
 
