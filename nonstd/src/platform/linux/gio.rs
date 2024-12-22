@@ -3,11 +3,12 @@ use gio::{
     glib::{
         ffi::{gpointer, GFALSE},
         translate::{from_glib_full, ToGlibPtr},
-        Error,
+        DateTime, Error,
     },
     prelude::{CancellableExt, DriveExt, FileExt, MountExt, VolumeExt, VolumeMonitorExt},
-    Cancellable, File, FileCopyFlags, FileQueryInfoFlags, FileType, IOErrorEnum,
+    Cancellable, File, FileCopyFlags, FileQueryInfoFlags, FileType, IOErrorEnum, VolumeMonitor,
 };
+use gtk::{gdk::Display, Clipboard, TargetEntry, TargetFlags};
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
@@ -25,9 +26,9 @@ static UUID: AtomicU32 = AtomicU32::new(0);
 static CANCELLABLES: Lazy<Mutex<HashMap<u32, Cancellable>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
-    gtk::init().unwrap();
+    let _ = gtk::init();
     let mut volumes = Vec::new();
-    let monitor = gio::VolumeMonitor::get();
+    let monitor = VolumeMonitor::get();
 
     for drive in monitor.connected_drives() {
         let mount_point = if drive.has_volumes() {
@@ -57,9 +58,9 @@ pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, Strin
         hidden: info.is_hidden(),
         system: info.file_type() == FileType::Special,
         device: info.file_type() == FileType::Mountable,
-        ctime: info.creation_date_time().unwrap_or(gtk::glib::DateTime::now_local().unwrap()).to_unix() as f64,
-        mtime: info.modification_date_time().unwrap_or(gtk::glib::DateTime::now_local().unwrap()).to_unix() as f64,
-        atime: info.access_date_time().unwrap_or(gtk::glib::DateTime::now_local().unwrap()).to_unix() as f64,
+        ctime: info.creation_date_time().unwrap_or(DateTime::now_local().unwrap()).to_unix() as f64,
+        mtime: info.modification_date_time().unwrap_or(DateTime::now_local().unwrap()).to_unix() as f64,
+        atime: info.access_date_time().unwrap_or(DateTime::now_local().unwrap()).to_unix() as f64,
         size: info.size() as u64,
     })
 }
@@ -70,7 +71,7 @@ pub(crate) fn read_urls_from_clipboard(_window_handle: isize) -> Result<Clipboar
         urls: Vec::new(),
     };
 
-    if let Some(clipboard) = gtk::Clipboard::default(&gtk::gdk::Display::default().unwrap()) {
+    if let Some(clipboard) = Clipboard::default(&Display::default().unwrap()) {
         if clipboard.wait_is_uris_available() {
             let urls: Vec<String> = clipboard.wait_for_uris().iter().map(|gs| gs.to_string()).collect();
 
@@ -85,8 +86,13 @@ pub(crate) fn read_urls_from_clipboard(_window_handle: isize) -> Result<Clipboar
 }
 
 pub(crate) fn write_urls_to_clipboard(_window_handle: isize, paths: &[String], _operation: Operation) -> Result<(), String> {
-    if let Some(_clipboard) = gtk::Clipboard::default(&gtk::gdk::Display::default().unwrap()) {
-        println!("{:?}", paths);
+    if let Some(clipboard) = Clipboard::default(&Display::default().unwrap()) {
+        let targets = &[TargetEntry::new("text/uri-list", TargetFlags::OTHER_APP, 0)];
+        let urls = paths.to_vec();
+        let _ = clipboard.set_with_data(targets, move |_, selection, _| {
+            let uri_list: Vec<&str> = urls.iter().map(|s| s.as_str()).collect();
+            selection.set_uris(uri_list.as_slice());
+        });
     }
     Ok(())
 }
