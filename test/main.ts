@@ -118,6 +118,7 @@ const toggle = () => {
     nostd.writeUrlsToClipboard(hwnd, ["C:\\DevProjects\\fs3.rs", "C:\\DevProjects\\fs2.rs"], "Move");
 };
 
+let openprop = false;
 const open = () => {
     const hwndBuffer = win.getNativeWindowHandle();
     let hwnd = 0;
@@ -126,7 +127,11 @@ const open = () => {
     } else {
         hwnd = hwndBuffer.readInt32BE();
     }
-    nostd.openFileProperty(hwnd, "C:\\DevProjects\\fs.rs");
+    if (openprop) {
+        nostd.openFileProperty(hwnd, "C:\\DevProjects\\fs.rs");
+    } else {
+        nostd.openPath(hwnd, "C:\\DevProjects\\fs.rs");
+    }
 };
 
 app.whenReady().then(async () => {

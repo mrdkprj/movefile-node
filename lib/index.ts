@@ -67,6 +67,10 @@ export const getFileAttribute = (filePath: string): FileAttribute => {
     return MoveFile.get_file_attribute(filePath);
 };
 
+export const openPath = (windowHandle: number, filePath: string) => {
+    return MoveFile.open_path(windowHandle, filePath);
+};
+
 export const openFileProperty = (windowHandle: number, filePath: string) => {
     return MoveFile.open_file_property(windowHandle, filePath);
 };

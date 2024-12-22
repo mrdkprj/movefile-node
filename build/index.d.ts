@@ -9,6 +9,7 @@ declare namespace MoveFile {
     function trash(file:string):void;
     function list_volumes():any[];
     function get_file_attribute(filePath:string):any;
+    function open_path(windowHandle:number, fullPath:string):void;
     function open_file_property(windowHandle:number, fullPath:string):void;
     function read_text(windowHandle:number):string;
     function write_text(windowHandle:number, text:string):void;
