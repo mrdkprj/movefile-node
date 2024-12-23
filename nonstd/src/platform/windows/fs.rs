@@ -1,3 +1,4 @@
+use super::util::{decode_wide, encode_wide, prefixed};
 use crate::{FileAttribute, Volume};
 use once_cell::sync::Lazy;
 use std::{
@@ -23,8 +24,6 @@ use windows::{
         UI::Shell::{FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, ShellExecuteExW, FOF_ALLOWUNDO, SEE_MASK_INVOKEIDLIST, SHELLEXECUTEINFOW},
     },
 };
-
-use super::util::{decode_wide, encode_wide, prefixed};
 
 static UUID: AtomicU32 = AtomicU32::new(0);
 static CANCELLABLES: Lazy<Mutex<HashMap<u32, u32>>> = Lazy::new(|| Mutex::new(HashMap::new()));
