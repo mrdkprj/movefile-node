@@ -1,3 +1,4 @@
+use crate::{FileAttribute, Volume};
 use gio::{
     ffi::{g_file_copy, G_FILE_COPY_ALL_METADATA, G_FILE_COPY_OVERWRITE},
     glib::{
@@ -8,7 +9,6 @@ use gio::{
     prelude::{CancellableExt, DriveExt, FileExt, MountExt, VolumeExt, VolumeMonitorExt},
     Cancellable, File, FileCopyFlags, FileQueryInfoFlags, FileType, IOErrorEnum, VolumeMonitor,
 };
-use gtk::{gdk::Display, Clipboard, TargetEntry, TargetFlags};
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
@@ -20,12 +20,10 @@ use std::{
     },
 };
 
-use crate::{ClipboardData, FileAttribute, Operation, Volume};
-
 static UUID: AtomicU32 = AtomicU32::new(0);
 static CANCELLABLES: Lazy<Mutex<HashMap<u32, Cancellable>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
+pub fn list_volumes() -> Result<Vec<Volume>, String> {
     let _ = gtk::init();
     let mut volumes = Vec::new();
     let monitor = VolumeMonitor::get();
@@ -48,7 +46,7 @@ pub(crate) fn list_volumes() -> Result<Vec<Volume>, String> {
     Ok(volumes)
 }
 
-pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
+pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
     let file = File::for_parse_name(file_path);
     let info = file.query_info("standard::*", FileQueryInfoFlags::NONE, Cancellable::NONE).unwrap();
 
@@ -65,36 +63,12 @@ pub(crate) fn get_file_attribute(file_path: &str) -> Result<FileAttribute, Strin
     })
 }
 
-pub(crate) fn read_urls_from_clipboard(_window_handle: isize) -> Result<ClipboardData, String> {
-    let data = ClipboardData {
-        operation: Operation::None,
-        urls: Vec::new(),
-    };
-
-    if let Some(clipboard) = Clipboard::default(&Display::default().unwrap()) {
-        if clipboard.wait_is_uris_available() {
-            let urls: Vec<String> = clipboard.wait_for_uris().iter().map(|gs| gs.to_string()).collect();
-
-            return Ok(ClipboardData {
-                operation: Operation::None,
-                urls,
-            });
-        }
-    }
-
-    Ok(data)
+pub fn open_file_property(_window_handle: isize, _file_path: String) -> Result<(), String> {
+    Ok(())
 }
 
-pub(crate) fn write_urls_to_clipboard(_window_handle: isize, paths: &[String], _operation: Operation) -> Result<(), String> {
-    if let Some(clipboard) = Clipboard::default(&Display::default().unwrap()) {
-        let targets = &[TargetEntry::new("text/uri-list", TargetFlags::OTHER_APP, 0)];
-        let urls = paths.to_vec();
-        let _ = clipboard.set_with_data(targets, move |_, selection, _| {
-            let uri_list: Vec<&str> = urls.iter().map(|s| s.as_str()).collect();
-            selection.set_uris(uri_list.as_slice());
-        });
-    }
-    Ok(())
+pub fn open_path(_window_handle: isize, file_path: String) -> Result<(), String> {
+    gio::AppInfo::launch_default_for_uri(&file_path, gio::AppLaunchContext::NONE).map_err(|e| e.message().to_string())
 }
 
 struct BulkProgressData<'a> {
@@ -104,7 +78,7 @@ struct BulkProgressData<'a> {
     in_process: bool,
 }
 
-pub(crate) fn reserve_cancellable() -> u32 {
+pub fn reserve_cancellable() -> u32 {
     let id = UUID.fetch_add(1, Ordering::Relaxed);
 
     let mut tokens = CANCELLABLES.lock().unwrap();
@@ -114,7 +88,7 @@ pub(crate) fn reserve_cancellable() -> u32 {
     id
 }
 
-pub(crate) fn mv(source_file: String, dest_file: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+pub fn mv(source_file: String, dest_file: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let result = inner_move(source_file, dest_file, callback, cancel_id);
     clean_up(cancel_id);
     result
@@ -141,7 +115,7 @@ fn inner_move(source_file: String, dest_file: String, callback: Option<&mut dyn 
     Ok(())
 }
 
-pub(crate) fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let result = inner_mv_bulk(source_files, dest_dir, callback, cancel_id);
     clean_up(cancel_id);
     result
@@ -263,7 +237,7 @@ unsafe extern "C" fn progress_callback(current_num_bytes: i64, total_num_bytes: 
     }
 }
 
-pub(crate) fn cancel(id: u32) -> bool {
+pub fn cancel(id: u32) -> bool {
     if let Ok(tokens) = CANCELLABLES.try_lock() {
         if let Some(token) = tokens.get(&id) {
             token.cancel();
@@ -274,7 +248,7 @@ pub(crate) fn cancel(id: u32) -> bool {
     false
 }
 
-pub(crate) fn trash(file: String) -> Result<(), String> {
+pub fn trash(file: String) -> Result<(), String> {
     let file = File::for_parse_name(&file);
     file.trash(Cancellable::NONE).map_err(|e| e.message().to_string())
 }

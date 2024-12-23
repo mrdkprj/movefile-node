@@ -24,6 +24,7 @@ const createWindow = () => {
 
     const vols = nostd.listVolumes();
     console.log(vols);
+
     // const hwndBuffer = win.getNativeWindowHandle();
     // let hwnd = 0;
     // if (os.endianness() == "LE") {
@@ -115,7 +116,7 @@ const toggle = () => {
     } else {
         hwnd = hwndBuffer.readInt32BE();
     }
-    nostd.writeUrlsToClipboard(hwnd, ["C:\\DevProjects\\fs3.rs", "C:\\DevProjects\\fs2.rs"], "Move");
+    nostd.writeUrlsToClipboard(hwnd, [path.join(__dirname, "..", "package.json"), path.join(__dirname, "..", "tsconfig.json")], "Move");
 };
 
 let openprop = false;
@@ -127,10 +128,11 @@ const open = () => {
     } else {
         hwnd = hwndBuffer.readInt32BE();
     }
+    console.log(path.join(__dirname, "..", "package.json"));
     if (openprop) {
-        nostd.openFileProperty(hwnd, "C:\\DevProjects\\fs.rs");
+        nostd.openFileProperty(hwnd, path.join(__dirname, "..", "package.json"));
     } else {
-        nostd.openPath(hwnd, "C:\\DevProjects\\fs.rs");
+        nostd.openPath(hwnd, path.join(__dirname, "..", "package.json"));
     }
 };
 

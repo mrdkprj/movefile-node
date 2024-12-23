@@ -1,4 +1,7 @@
 pub mod platform;
+#[cfg(target_os = "linux")]
+pub use platform::linux::*;
+#[cfg(target_os = "windows")]
 pub use platform::windows::*;
 
 #[derive(Debug, Clone)]

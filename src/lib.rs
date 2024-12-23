@@ -332,6 +332,13 @@ pub fn open_file_property(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
+pub fn open_path(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
+    let source_file = cx.argument::<JsString>(1)?.value(&mut cx);
+    let _ = nonstd::fs::open_path(window_handle as isize, source_file);
+    Ok(cx.undefined())
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv", mv)?;
@@ -347,6 +354,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("read_text", read_text)?;
     cx.export_function("write_text", write_text)?;
     cx.export_function("open_file_property", open_file_property)?;
+    cx.export_function("open_path", open_path)?;
 
     Ok(())
 }
