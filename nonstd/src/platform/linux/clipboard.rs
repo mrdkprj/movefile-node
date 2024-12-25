@@ -46,7 +46,7 @@ pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
     })
 }
 
-pub fn is_text_availabel() -> bool {
+pub fn is_text_available() -> bool {
     if let Some(clipboard) = Clipboard::default(&Display::default().unwrap()) {
         return clipboard.wait_is_text_available();
     }

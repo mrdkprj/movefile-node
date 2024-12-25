@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 import os from "os";
 import path from "path";
 import fs from "fs";
-import * as nostd from "../lib/index";
+import { fs as fs2, clipboard, Progress } from "../lib/index";
 
 let sync = false;
 let win: BrowserWindow;
@@ -22,7 +22,7 @@ const createWindow = () => {
 
     win.loadFile("index.html");
 
-    const vols = nostd.listVolumes();
+    const vols = fs2.listVolumes();
     console.log(vols);
 
     // const hwndBuffer = win.getNativeWindowHandle();
@@ -44,10 +44,10 @@ const handleSetTitle = async (_e: any, s: string, d: string) => {
     try {
         if (fs.existsSync(s)) {
             console.log(s);
-            sync ? await nostd.mv(s, d, progressCb) : await nostd.mv(s, d);
+            sync ? await fs2.mv(s, d, progressCb) : await fs2.mv(s, d);
         } else {
             console.log(d);
-            sync ? await nostd.mv(d, s, progressCb) : await nostd.mv(d, s);
+            sync ? await fs2.mv(d, s, progressCb) : await fs2.mv(d, s);
         }
     } catch (ex: any) {
         console.log("error");
@@ -58,7 +58,7 @@ const handleSetTitle = async (_e: any, s: string, d: string) => {
     // cancel(id);
 };
 let count = 0;
-const progressCb = (progress: nostd.Progress) => {
+const progressCb = (progress: Progress) => {
     count++;
 
     // if (count > 3) {
@@ -79,7 +79,7 @@ const append = () => {
     allDirents
         .filter((dirent, i) => {
             try {
-                const x = nostd.getFileAttribute(path.join(directory, dirent.name));
+                const x = fs2.getFileAttribute(path.join(directory, dirent.name));
 
                 if (i == 2) {
                     const s = fs.statSync(path.join(directory, dirent.name));
@@ -102,7 +102,7 @@ const append = () => {
 
 const reload = async (_e: any, s: string[], d: string) => {
     try {
-        sync ? await nostd.mvBulk(s, d, progressCb) : await nostd.mvBulk(s, d);
+        sync ? await fs2.mvBulk(s, d, progressCb) : await fs2.mvBulk(s, d);
     } catch (ex: any) {
         dialog.showErrorBox("e", ex.message);
     }
@@ -116,7 +116,7 @@ const toggle = () => {
     } else {
         hwnd = hwndBuffer.readInt32BE();
     }
-    nostd.writeUrlsToClipboard(hwnd, [path.join(__dirname, "..", "package.json"), path.join(__dirname, "..", "tsconfig.json")], "Move");
+    clipboard.writeUris(hwnd, [path.join(__dirname, "..", "package.json"), path.join(__dirname, "..", "tsconfig.json")], "Move");
 };
 
 let openprop = false;
@@ -130,9 +130,9 @@ const open = () => {
     }
     console.log(path.join(__dirname, "..", "package.json"));
     if (openprop) {
-        nostd.openFileProperty(hwnd, path.join(__dirname, "..", "package.json"));
+        fs2.openFileProperty(hwnd, path.join(__dirname, "..", "package.json"));
     } else {
-        nostd.openPath(hwnd, path.join(__dirname, "..", "package.json"));
+        fs2.openPath(hwnd, path.join(__dirname, "..", "package.json"));
     }
 };
 

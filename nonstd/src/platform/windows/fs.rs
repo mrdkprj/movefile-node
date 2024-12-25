@@ -99,14 +99,16 @@ fn to_msecs(low: u32, high: u32) -> f64 {
 pub fn open_path(window_handle: isize, file_path: String) -> Result<(), String> {
     let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
 
-    let mut info = SHELLEXECUTEINFOW::default();
-    info.cbSize = size_of::<SHELLEXECUTEINFOW>() as u32;
-    info.hwnd = HWND(window_handle as _);
     let wide_verb = encode_wide("open");
-    info.lpVerb = PCWSTR::from_raw(wide_verb.as_ptr());
-    info.fMask = SEE_MASK_INVOKEIDLIST;
     let wide_path = encode_wide(file_path);
-    info.lpFile = PCWSTR::from_raw(wide_path.as_ptr());
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: size_of::<SHELLEXECUTEINFOW>() as u32,
+        hwnd: HWND(window_handle as _),
+        lpVerb: PCWSTR::from_raw(wide_verb.as_ptr()),
+        fMask: SEE_MASK_INVOKEIDLIST,
+        lpFile: PCWSTR::from_raw(wide_path.as_ptr()),
+        ..Default::default()
+    };
     unsafe { ShellExecuteExW(&mut info).map_err(|e| e.message()) }?;
 
     Ok(())
@@ -115,14 +117,16 @@ pub fn open_path(window_handle: isize, file_path: String) -> Result<(), String> 
 pub fn open_file_property(window_handle: isize, file_path: String) -> Result<(), String> {
     let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
 
-    let mut info = SHELLEXECUTEINFOW::default();
-    info.cbSize = size_of::<SHELLEXECUTEINFOW>() as u32;
-    info.hwnd = HWND(window_handle as _);
     let wide_verb = encode_wide("properties");
-    info.lpVerb = PCWSTR::from_raw(wide_verb.as_ptr());
-    info.fMask = SEE_MASK_INVOKEIDLIST;
     let wide_path = encode_wide(file_path);
-    info.lpFile = PCWSTR::from_raw(wide_path.as_ptr());
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: size_of::<SHELLEXECUTEINFOW>() as u32,
+        hwnd: HWND(window_handle as _),
+        lpVerb: PCWSTR::from_raw(wide_verb.as_ptr()),
+        fMask: SEE_MASK_INVOKEIDLIST,
+        lpFile: PCWSTR::from_raw(wide_path.as_ptr()),
+        ..Default::default()
+    };
     unsafe { ShellExecuteExW(&mut info).map_err(|e| e.message()) }?;
 
     Ok(())
@@ -228,8 +232,8 @@ fn inner_mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&
             let dest_file_fallback = dest_file.clone();
 
             let done = match unsafe {
-                let source_wide = encode_wide(prefixed(&source_file));
-                let dest_wide = encode_wide(prefixed(&dest_file));
+                let source_wide = encode_wide(prefixed(source_file));
+                let dest_wide = encode_wide(prefixed(dest_file));
                 MoveFileWithProgressW(
                     PCWSTR::from_raw(source_wide.as_ptr()),
                     PCWSTR::from_raw(dest_wide.as_ptr()),
@@ -263,8 +267,8 @@ fn inner_mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&
             let dest_file_fallback = dest_file.clone();
 
             let done = match unsafe {
-                let source_wide = encode_wide(prefixed(&source_file));
-                let dest_wide = encode_wide(prefixed(&dest_file));
+                let source_wide = encode_wide(prefixed(source_file));
+                let dest_wide = encode_wide(prefixed(dest_file));
                 MoveFileExW(PCWSTR::from_raw(source_wide.as_ptr()), PCWSTR::from_raw(dest_wide.as_ptr()), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
             } {
                 Ok(_) => move_fallback(source_file_fallback, dest_file_fallback)?,

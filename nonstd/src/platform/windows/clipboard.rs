@@ -1,24 +1,21 @@
-use super::util::{decode_wide, encode_wide};
+use super::util::{decode_wide, encode_wide, global_free};
 use crate::{ClipboardData, Operation};
-use windows::{
-    core::HRESULT,
-    Win32::{
-        Foundation::{GlobalFree, HANDLE, HGLOBAL, HWND},
-        System::{
-            DataExchange::{CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW, SetClipboardData},
-            Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
-            Ole::{CF_HDROP, CF_TEXT, DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_NONE},
-        },
-        UI::Shell::{DragQueryFileW, CFSTR_PREFERREDDROPEFFECT, DROPFILES, HDROP},
+use windows::Win32::{
+    Foundation::{HANDLE, HGLOBAL, HWND},
+    System::{
+        DataExchange::{CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW, SetClipboardData},
+        Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
+        Ole::{CF_HDROP, CF_TEXT, DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_NONE},
     },
+    UI::Shell::{DragQueryFileW, CFSTR_PREFERREDDROPEFFECT, DROPFILES, HDROP},
 };
 
-pub fn is_text_availabel() -> bool {
+pub fn is_text_available() -> bool {
     unsafe { IsClipboardFormatAvailable(CF_TEXT.0 as u32).is_ok() }
 }
 
 pub fn read_text(window_handle: isize) -> Result<String, String> {
-    if !is_text_availabel() {
+    if !is_text_available() {
         return Ok(String::new());
     }
 
@@ -57,7 +54,7 @@ pub fn write_text(window_handle: isize, text: String) -> Result<(), String> {
     let ptr = unsafe { GlobalLock(hglobal) } as *mut u8;
     if ptr.is_null() {
         global_free(hglobal)?;
-        return Err("Failed to lock memory".to_string());
+        return Err("Failed to free memory".to_string());
     }
 
     unsafe { std::ptr::copy_nonoverlapping(text.as_ptr(), ptr, text.len()) };
@@ -182,7 +179,7 @@ pub fn write_uris(window_handle: isize, paths: &[String], operation: Operation) 
     let ptr_operation = unsafe { GlobalLock(hglobal_operation) } as *mut u32;
     if ptr_operation.is_null() {
         global_free(hglobal_operation)?;
-        return Err("Failed to lock memory".to_string());
+        return Err("Failed to free memory".to_string());
     }
 
     unsafe { *ptr_operation = operation_value };
@@ -194,25 +191,12 @@ pub fn write_uris(window_handle: isize, paths: &[String], operation: Operation) 
     if unsafe { SetClipboardData(custom_format, HANDLE(hglobal_operation.0)).is_err() } {
         unsafe { CloseClipboard().map_err(|e| e.message()) }?;
         global_free(hglobal_operation)?;
-        return Err("Failed to write clipboard2".to_string());
+        return Err("Failed to write clipboard format".to_string());
     }
 
     unsafe { CloseClipboard().map_err(|e| e.message()) }?;
 
     Ok(())
-}
-
-fn global_free(hglobal: HGLOBAL) -> Result<(), String> {
-    match unsafe { GlobalFree(hglobal) } {
-        Ok(_) => Ok(()),
-        Err(err) => {
-            if err.code() == HRESULT(0x00000000) {
-                Ok(())
-            } else {
-                Err(err.message())
-            }
-        }
-    }
 }
 
 fn get_preferred_drop_effect() -> Operation {

@@ -731,6 +731,7 @@ dependencies = [
  "gtk",
  "once_cell",
  "windows",
+ "windows-core",
 ]
 
 [[package]]

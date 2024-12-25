@@ -64,6 +64,10 @@ pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
     }
 }
 
+pub fn is_text_available(mut cx: FunctionContext) -> JsResult<JsBoolean> {
+    Ok(cx.boolean(nonstd::clipboard::is_text_available()))
+}
+
 pub fn read_text(mut cx: FunctionContext) -> JsResult<JsString> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     match nonstd::clipboard::read_text(window_handle as isize) {
@@ -79,7 +83,11 @@ pub fn write_text(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
-pub fn read_urls_from_clipboard(mut cx: FunctionContext) -> JsResult<JsObject> {
+pub fn is_uris_available(mut cx: FunctionContext) -> JsResult<JsBoolean> {
+    Ok(cx.boolean(nonstd::clipboard::is_uris_available()))
+}
+
+pub fn read_uris(mut cx: FunctionContext) -> JsResult<JsObject> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     match nonstd::clipboard::read_uris(window_handle as isize) {
         Ok(data) => {
@@ -102,7 +110,7 @@ pub fn read_urls_from_clipboard(mut cx: FunctionContext) -> JsResult<JsObject> {
     }
 }
 
-pub fn write_urls_to_clipboard(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+pub fn write_uris(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     let files: Vec<String> = cx.argument::<JsArray>(1)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect();
     let operation_str = cx.argument::<JsString>(2)?.value(&mut cx);
@@ -349,12 +357,14 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv_bulk", mv_bulk)?;
     cx.export_function("list_volumes", list_volumes)?;
     cx.export_function("get_file_attribute", get_file_attribute)?;
-    cx.export_function("read_urls_from_clipboard", read_urls_from_clipboard)?;
-    cx.export_function("write_urls_to_clipboard", write_urls_to_clipboard)?;
+    cx.export_function("read_uris", read_uris)?;
+    cx.export_function("write_uris", write_uris)?;
     cx.export_function("read_text", read_text)?;
     cx.export_function("write_text", write_text)?;
     cx.export_function("open_file_property", open_file_property)?;
     cx.export_function("open_path", open_path)?;
+    cx.export_function("is_uris_available", is_uris_available)?;
+    cx.export_function("is_text_available", is_text_available)?;
 
     Ok(())
 }
