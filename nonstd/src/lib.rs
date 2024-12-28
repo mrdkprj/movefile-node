@@ -8,6 +8,8 @@ pub use platform::windows::*;
 pub struct Volume {
     pub mount_point: String,
     pub volume_label: String,
+    pub available_units: u64,
+    pub total_units: u64,
 }
 
 #[derive(Debug, Clone)]

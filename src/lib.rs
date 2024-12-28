@@ -27,6 +27,10 @@ pub fn list_volumes(mut cx: FunctionContext) -> JsResult<JsArray> {
                 obj.set(&mut cx, "mountPoint", a)?;
                 let a = cx.string(&volume.volume_label);
                 obj.set(&mut cx, "volumeLabel", a)?;
+                let a = cx.number(volume.available_units as f64);
+                obj.set(&mut cx, "availableUnits", a)?;
+                let a = cx.number(volume.total_units as f64);
+                obj.set(&mut cx, "totalUnits", a)?;
                 arr.set(&mut cx, i as u32, obj)?;
             }
             Ok(arr)

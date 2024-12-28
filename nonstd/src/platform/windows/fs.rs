@@ -16,9 +16,10 @@ use windows::{
     Win32::{
         Foundation::{HANDLE, HWND, MAX_PATH},
         Storage::FileSystem::{
-            DeleteFileW, FindClose, FindExInfoBasic, FindExSearchNameMatch, FindFirstFileExW, FindFirstVolumeW, FindNextVolumeW, FindVolumeClose, GetFileAttributesW, GetVolumeInformationW,
-            GetVolumePathNamesForVolumeNameW, MoveFileExW, MoveFileWithProgressW, FILE_ATTRIBUTE_DEVICE, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_READONLY,
-            FILE_ATTRIBUTE_SYSTEM, FIND_FIRST_EX_FLAGS, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, WIN32_FIND_DATAW,
+            DeleteFileW, FindClose, FindExInfoBasic, FindExSearchNameMatch, FindFirstFileExW, FindFirstVolumeW, FindNextVolumeW, FindVolumeClose, GetDiskFreeSpaceExW, GetFileAttributesW,
+            GetVolumeInformationW, GetVolumePathNamesForVolumeNameW, MoveFileExW, MoveFileWithProgressW, FILE_ATTRIBUTE_DEVICE, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_HIDDEN,
+            FILE_ATTRIBUTE_READONLY, FILE_ATTRIBUTE_SYSTEM, FIND_FIRST_EX_FLAGS, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+            WIN32_FIND_DATAW,
         },
         System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_APARTMENTTHREADED},
         UI::Shell::{FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, ShellExecuteExW, FOF_ALLOWUNDO, SEE_MASK_INVOKEIDLIST, SHELLEXECUTEINFOW},
@@ -49,10 +50,24 @@ pub fn list_volumes() -> Result<Vec<Volume>, String> {
 
         let volume_label = decode_wide(&volume_label_ptr);
 
-        volumes.push(Volume {
-            mount_point,
-            volume_label,
-        });
+        if mount_point.is_empty() {
+            volumes.push(Volume {
+                mount_point,
+                volume_label,
+                available_units: 0,
+                total_units: 0,
+            });
+        } else {
+            let mut available = 0;
+            let mut total = 0;
+            unsafe { GetDiskFreeSpaceExW(PCWSTR::from_raw(drive_paths.as_ptr()), None, Some(&mut total), Some(&mut available)).map_err(|e| e.message()) }?;
+            volumes.push(Volume {
+                mount_point,
+                volume_label,
+                available_units: available,
+                total_units: total,
+            });
+        }
 
         volume_name = vec![0u16; MAX_PATH as usize];
         let next = unsafe { FindNextVolumeW(handle, &mut volume_name) };

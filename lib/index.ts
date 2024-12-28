@@ -8,6 +8,8 @@ export type ProgressCallback = (progress: Progress) => void;
 export type Volume = {
     mountPoint: string;
     volumeLabel: string;
+    availableUnits: number;
+    totalUnits: number;
 };
 export type FileAttribute = {
     directory: boolean;
