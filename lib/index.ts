@@ -74,6 +74,10 @@ export class fs {
         return MoveFile.open_path(windowHandle, filePath);
     };
 
+    static openPathWith = (windowHandle: number, filePath: string) => {
+        return MoveFile.open_path_with(windowHandle, filePath);
+    };
+
     static openFileProperty = (windowHandle: number, filePath: string) => {
         return MoveFile.open_file_property(windowHandle, filePath);
     };

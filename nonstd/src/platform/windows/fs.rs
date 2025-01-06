@@ -129,6 +129,24 @@ pub fn open_path(window_handle: isize, file_path: String) -> Result<(), String> 
     Ok(())
 }
 
+pub fn open_path_with(window_handle: isize, file_path: String) -> Result<(), String> {
+    let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+
+    let wide_verb = encode_wide("openas");
+    let wide_path = encode_wide(file_path);
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: size_of::<SHELLEXECUTEINFOW>() as u32,
+        hwnd: HWND(window_handle as _),
+        lpVerb: PCWSTR::from_raw(wide_verb.as_ptr()),
+        fMask: SEE_MASK_INVOKEIDLIST,
+        lpFile: PCWSTR::from_raw(wide_path.as_ptr()),
+        ..Default::default()
+    };
+    unsafe { ShellExecuteExW(&mut info).map_err(|e| e.message()) }?;
+
+    Ok(())
+}
+
 pub fn open_file_property(window_handle: isize, file_path: String) -> Result<(), String> {
     let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
 
@@ -146,7 +164,6 @@ pub fn open_file_property(window_handle: isize, file_path: String) -> Result<(),
 
     Ok(())
 }
-
 struct ProgressData<'a> {
     cancel_id: Option<u32>,
     callback: Option<&'a mut dyn FnMut(i64, i64)>,

@@ -10,6 +10,7 @@ declare namespace MoveFile {
     function list_volumes():any[];
     function get_file_attribute(filePath:string):any;
     function open_path(windowHandle:number, fullPath:string):void;
+    function open_path_with(windowHandle:number, fullPath:string):void;
     function open_file_property(windowHandle:number, fullPath:string):void;
     function is_text_available():boolean;
     function read_text(windowHandle:number):string;

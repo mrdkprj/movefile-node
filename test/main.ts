@@ -136,6 +136,18 @@ const open = () => {
     }
 };
 
+const openwith = () => {
+    const hwndBuffer = win.getNativeWindowHandle();
+    let hwnd = 0;
+    if (os.endianness() == "LE") {
+        hwnd = hwndBuffer.readInt32LE();
+    } else {
+        hwnd = hwndBuffer.readInt32BE();
+    }
+
+    fs2.openPathWith(hwnd, path.join(__dirname, "..", "package.json"));
+};
+
 app.whenReady().then(async () => {
     createWindow();
     ipcMain.on("set-title", handleSetTitle);
@@ -143,6 +155,7 @@ app.whenReady().then(async () => {
     ipcMain.on("append", append);
     ipcMain.on("reload", reload);
     ipcMain.on("open", open);
+    ipcMain.on("openwith", openwith);
 });
 
 app.on("window-all-closed", () => {
