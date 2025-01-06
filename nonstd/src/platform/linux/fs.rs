@@ -9,6 +9,7 @@ use gio::{
     prelude::{CancellableExt, DriveExt, FileExt, MountExt, VolumeExt, VolumeMonitorExt},
     Cancellable, File, FileCopyFlags, FileQueryInfoFlags, FileType, IOErrorEnum, VolumeMonitor,
 };
+use gtk::{prelude::WidgetExt, DialogFlags};
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
@@ -40,6 +41,8 @@ pub fn list_volumes() -> Result<Vec<Volume>, String> {
         volumes.push(Volume {
             mount_point,
             volume_label,
+            available_units: 0,
+            total_units: 0,
         });
     }
 
@@ -69,6 +72,13 @@ pub fn open_file_property(_window_handle: isize, _file_path: String) -> Result<(
 
 pub fn open_path(_window_handle: isize, file_path: String) -> Result<(), String> {
     gio::AppInfo::launch_default_for_uri(&file_path, gio::AppLaunchContext::NONE).map_err(|e| e.message().to_string())
+}
+
+pub fn open_path_with(_window_handle: isize, file_path: String) -> Result<(), String> {
+    let file = File::for_parse_name(&file_path);
+    let dialog = gtk::AppChooserDialog::new(gtk::Window::NONE, DialogFlags::DESTROY_WITH_PARENT, &file);
+    dialog.show_all();
+    Ok(())
 }
 
 struct BulkProgressData<'a> {
