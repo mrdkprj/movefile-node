@@ -21,7 +21,7 @@ use windows::{
             FILE_ATTRIBUTE_READONLY, FILE_ATTRIBUTE_SYSTEM, FIND_FIRST_EX_FLAGS, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
             WIN32_FIND_DATAW,
         },
-        System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_APARTMENTTHREADED},
+        System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED},
         UI::Shell::{FileOperation, IFileOperation, IShellItem, SHCreateItemFromParsingName, ShellExecuteExW, FOF_ALLOWUNDO, SEE_MASK_INVOKEIDLIST, SHELLEXECUTEINFOW},
     },
 };
@@ -125,6 +125,7 @@ pub fn open_path(window_handle: isize, file_path: String) -> Result<(), String> 
         ..Default::default()
     };
     unsafe { ShellExecuteExW(&mut info).map_err(|e| e.message()) }?;
+    unsafe { CoUninitialize() };
 
     Ok(())
 }
@@ -143,6 +144,7 @@ pub fn open_path_with(window_handle: isize, file_path: String) -> Result<(), Str
         ..Default::default()
     };
     unsafe { ShellExecuteExW(&mut info).map_err(|e| e.message()) }?;
+    unsafe { CoUninitialize() };
 
     Ok(())
 }
@@ -161,6 +163,7 @@ pub fn open_file_property(window_handle: isize, file_path: String) -> Result<(),
         ..Default::default()
     };
     unsafe { ShellExecuteExW(&mut info).map_err(|e| e.message()) }?;
+    unsafe { CoUninitialize() };
 
     Ok(())
 }
@@ -429,16 +432,16 @@ pub fn cancel(id: u32) -> bool {
 }
 
 pub fn trash(file: String) -> Result<(), String> {
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+    let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
 
-        let op: IFileOperation = CoCreateInstance(&FileOperation, None, CLSCTX_ALL).map_err(|e| e.message())?;
-        op.SetOperationFlags(FOF_ALLOWUNDO).map_err(|e| e.message())?;
-        let file_wide = encode_wide(prefixed(&file));
-        let shell_item: IShellItem = SHCreateItemFromParsingName(PCWSTR::from_raw(file_wide.as_ptr()), None).map_err(|e| e.message())?;
-        op.DeleteItem(&shell_item, None).map_err(|e| e.message())?;
-        op.PerformOperations().map_err(|e| e.message())?;
-    }
+    let op: IFileOperation = unsafe { CoCreateInstance(&FileOperation, None, CLSCTX_ALL).map_err(|e| e.message()) }?;
+    unsafe { op.SetOperationFlags(FOF_ALLOWUNDO).map_err(|e| e.message()) }?;
+    let file_wide = encode_wide(prefixed(&file));
+    let shell_item: IShellItem = unsafe { SHCreateItemFromParsingName(PCWSTR::from_raw(file_wide.as_ptr()), None).map_err(|e| e.message()) }?;
+    unsafe { op.DeleteItem(&shell_item, None).map_err(|e| e.message()) }?;
+    unsafe { op.PerformOperations().map_err(|e| e.message()) }?;
+
+    unsafe { CoUninitialize() };
 
     Ok(())
 }
