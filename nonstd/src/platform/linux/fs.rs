@@ -9,7 +9,6 @@ use gio::{
     prelude::{CancellableExt, DriveExt, FileExt, MountExt, VolumeExt, VolumeMonitorExt},
     Cancellable, File, FileCopyFlags, FileQueryInfoFlags, FileType, IOErrorEnum, VolumeMonitor,
 };
-use gtk::{prelude::WidgetExt, DialogFlags};
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
@@ -66,21 +65,6 @@ pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
     })
 }
 
-pub fn open_file_property(_window_handle: isize, _file_path: String) -> Result<(), String> {
-    Ok(())
-}
-
-pub fn open_path(_window_handle: isize, file_path: String) -> Result<(), String> {
-    gio::AppInfo::launch_default_for_uri(&file_path, gio::AppLaunchContext::NONE).map_err(|e| e.message().to_string())
-}
-
-pub fn open_path_with(_window_handle: isize, file_path: String) -> Result<(), String> {
-    let file = File::for_parse_name(&file_path);
-    let dialog = gtk::AppChooserDialog::new(gtk::Window::NONE, DialogFlags::DESTROY_WITH_PARENT, &file);
-    dialog.show_all();
-    Ok(())
-}
-
 struct BulkProgressData<'a> {
     callback: Option<&'a mut dyn FnMut(i64, i64)>,
     total: i64,
@@ -125,7 +109,7 @@ fn inner_move(source_file: String, dest_file: String, callback: Option<&mut dyn 
     Ok(())
 }
 
-pub fn mv_bulk(source_files: Vec<String>, dest_dir: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+pub fn mv_all(source_files: Vec<String>, dest_dir: String, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let result = inner_mv_bulk(source_files, dest_dir, callback, cancel_id);
     clean_up(cancel_id);
     result
@@ -256,9 +240,4 @@ pub fn cancel(id: u32) -> bool {
     }
 
     false
-}
-
-pub fn trash(file: String) -> Result<(), String> {
-    let file = File::for_parse_name(&file);
-    file.trash(Cancellable::NONE).map_err(|e| e.message().to_string())
 }

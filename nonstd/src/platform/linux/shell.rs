@@ -1,31 +1,43 @@
-/*
-   use std::ptr::{null, null_mut};
+use gio::{glib::ToVariant, prelude::FileExt, Cancellable, DBusCallFlags, DBusConnectionFlags, File};
+use gtk::{prelude::WidgetExt, DialogFlags};
 
-   let bus = gio_sys::g_bus_get_sync(gio_sys::G_BUS_TYPE_SESSION, null_mut(), null_mut());
-   if bus.is_null() {
-       return;
-   }
-   let uris = [uri, null()];
-   let args = glib_sys::g_variant_new(
-       b"(^ass)\0".as_ptr() as *const _,
-       uris.as_ptr(),
-       b"\0".as_ptr(),
-   );
-   let ret = gio_sys::g_dbus_connection_call_sync(
-       bus,
-       b"org.freedesktop.FileManager1\0".as_ptr() as *const _,
-       b"/org/freedesktop/FileManager1\0".as_ptr() as *const _,
-       b"org.freedesktop.FileManager1\0".as_ptr() as *const _,
-       b"ShowItems\0".as_ptr() as *const _,
-       args,
-       null(),
-       0,
-       -1,
-       null_mut(),
-       null_mut(),
-   );
-   if !ret.is_null() {
-       glib_sys::g_variant_unref(ret);
-   }
-   gobject_sys::g_object_unref(bus as *mut _);
-*/
+pub fn open_file_property(_window_handle: isize, _file_path: String) -> Result<(), String> {
+    Ok(())
+}
+
+pub fn open_path(_window_handle: isize, file_path: String) -> Result<(), String> {
+    gio::AppInfo::launch_default_for_uri(&file_path, gio::AppLaunchContext::NONE).map_err(|e| e.message().to_string())
+}
+
+pub fn open_path_with(_window_handle: isize, file_path: String) -> Result<(), String> {
+    let file = File::for_parse_name(&file_path);
+    let dialog = gtk::AppChooserDialog::new(gtk::Window::NONE, DialogFlags::DESTROY_WITH_PARENT, &file);
+    dialog.show_all();
+    Ok(())
+}
+
+pub fn show_item_in_folder(file_path: String) -> Result<(), String> {
+    let bus = gio::bus_get_sync(gio::BusType::Session, Cancellable::NONE).unwrap();
+    let conn = gio::DBusConnection::new_sync(&bus.stream(), None, DBusConnectionFlags::NONE, None, Cancellable::NONE).unwrap();
+    let t = ("ss".to_string(), file_path).to_variant();
+    let parameters = t;
+    conn.call_sync(
+        Some("org.freedesktop.FileManager1"),
+        "/org/freedesktop/FileManager1",
+        "org.freedesktop.FileManager1",
+        "ShowItems",
+        Some(&parameters),
+        None,
+        DBusCallFlags::NONE,
+        -1,
+        Cancellable::NONE,
+    )
+    .unwrap();
+
+    Ok(())
+}
+
+pub fn trash(file: String) -> Result<(), String> {
+    let file = File::for_parse_name(&file);
+    file.trash(Cancellable::NONE).map_err(|e| e.message().to_string())
+}
