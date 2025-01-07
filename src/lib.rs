@@ -141,7 +141,7 @@ pub fn mv(cx: FunctionContext) -> JsResult<JsPromise> {
     }
 }
 
-pub fn mv_bulk(cx: FunctionContext) -> JsResult<JsPromise> {
+pub fn mv_all(cx: FunctionContext) -> JsResult<JsPromise> {
     if cx.len() > 2 {
         listen_mv(cx, true)
     } else {
@@ -178,7 +178,7 @@ fn spawn_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
 
     if bulk {
         async_std::task::spawn(async move {
-            let result = nonstd::fs::mv_bulk(source_files, dest_file, None, id);
+            let result = nonstd::fs::mv_all(source_files, dest_file, None, id);
             deferred.settle_with(&channel, |mut cx| match result {
                 Ok(_) => Ok(cx.undefined()),
                 Err(e) => cx.throw_error(e),
@@ -216,7 +216,7 @@ fn listen_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
 
     if bulk {
         async_std::task::spawn(async move {
-            let result = nonstd::fs::mv_bulk(
+            let result = nonstd::fs::mv_all(
                 source_files,
                 dest_file,
                 Some(&mut |a, b| {
@@ -332,29 +332,35 @@ pub fn cancel(mut cx: FunctionContext) -> JsResult<JsBoolean> {
 }
 
 pub fn trash(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let source_file = cx.argument::<JsString>(0)?.value(&mut cx);
-    let _ = nonstd::fs::trash(source_file);
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let _ = nonstd::shell::trash(file_path);
     Ok(cx.undefined())
 }
 
 pub fn open_file_property(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    let source_file = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::fs::open_file_property(window_handle as isize, source_file);
+    let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
+    let _ = nonstd::shell::open_file_property(window_handle as isize, file_path);
     Ok(cx.undefined())
 }
 
 pub fn open_path(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    let source_file = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::fs::open_path(window_handle as isize, source_file);
+    let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
+    let _ = nonstd::shell::open_path(window_handle as isize, file_path);
     Ok(cx.undefined())
 }
 
 pub fn open_path_with(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    let source_file = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::fs::open_path_with(window_handle as isize, source_file);
+    let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
+    let _ = nonstd::shell::open_path_with(window_handle as isize, file_path);
+    Ok(cx.undefined())
+}
+
+pub fn show_item_in_folder(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let _ = nonstd::shell::show_item_in_folder(file_path);
     Ok(cx.undefined())
 }
 
@@ -365,7 +371,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("cancel", cancel)?;
     cx.export_function("reserve_cancellable", reserve_cancellable)?;
     cx.export_function("trash", trash)?;
-    cx.export_function("mv_bulk", mv_bulk)?;
+    cx.export_function("mv_all", mv_all)?;
     cx.export_function("list_volumes", list_volumes)?;
     cx.export_function("get_file_attribute", get_file_attribute)?;
     cx.export_function("read_uris", read_uris)?;
@@ -377,6 +383,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("open_path_with", open_path_with)?;
     cx.export_function("is_uris_available", is_uris_available)?;
     cx.export_function("is_text_available", is_text_available)?;
+    cx.export_function("show_item_in_folder", show_item_in_folder)?;
 
     Ok(())
 }

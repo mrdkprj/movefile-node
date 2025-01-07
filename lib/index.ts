@@ -38,11 +38,11 @@ export class fs {
         }
     };
 
-    static mvBulk = async (sourceFiles: string[], destDir: string, callback?: ProgressCallback, id?: number) => {
+    static mvAll = async (sourceFiles: string[], destDir: string, callback?: ProgressCallback, id?: number) => {
         if (callback) {
-            return await MoveFile.mv_bulk(sourceFiles, destDir, callback, id);
+            return await MoveFile.mv_all(sourceFiles, destDir, callback, id);
         } else {
-            return await MoveFile.mv_bulk(sourceFiles, destDir);
+            return await MoveFile.mv_all(sourceFiles, destDir);
         }
     };
 
@@ -58,16 +58,18 @@ export class fs {
         return MoveFile.reserve_cancellable();
     };
 
-    static trash = (file: string): void => {
-        return MoveFile.trash(file);
-    };
-
     static listVolumes = (): Volume[] => {
         return MoveFile.list_volumes();
     };
 
     static getFileAttribute = (filePath: string): FileAttribute => {
         return MoveFile.get_file_attribute(filePath);
+    };
+}
+
+export class shell {
+    static trash = (file: string): void => {
+        return MoveFile.trash(file);
     };
 
     static openPath = (windowHandle: number, filePath: string) => {
@@ -80,6 +82,10 @@ export class fs {
 
     static openFileProperty = (windowHandle: number, filePath: string) => {
         return MoveFile.open_file_property(windowHandle, filePath);
+    };
+
+    static showItemInFolder = (filePath: string) => {
+        return MoveFile.show_item_in_folder(filePath);
     };
 }
 

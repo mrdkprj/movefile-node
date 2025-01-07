@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 import os from "os";
 import path from "path";
 import fs from "fs";
-import { fs as fs2, clipboard, Progress } from "../lib/index";
+import { fs as fs2, clipboard, Progress, shell } from "../lib/index";
 
 let sync = false;
 let win: BrowserWindow;
@@ -102,7 +102,7 @@ const append = () => {
 
 const reload = async (_e: any, s: string[], d: string) => {
     try {
-        sync ? await fs2.mvBulk(s, d, progressCb) : await fs2.mvBulk(s, d);
+        sync ? await fs2.mvAll(s, d, progressCb) : await fs2.mvAll(s, d);
     } catch (ex: any) {
         dialog.showErrorBox("e", ex.message);
     }
@@ -119,7 +119,7 @@ const toggle = () => {
     clipboard.writeUris(hwnd, [path.join(__dirname, "..", "package.json"), path.join(__dirname, "..", "tsconfig.json")], "Move");
 };
 
-let openprop = false;
+const openprop = false;
 const open = () => {
     const hwndBuffer = win.getNativeWindowHandle();
     let hwnd = 0;
@@ -128,14 +128,15 @@ const open = () => {
     } else {
         hwnd = hwndBuffer.readInt32BE();
     }
-    console.log(path.join(__dirname, "..", "package.json"));
+
     if (openprop) {
-        fs2.openFileProperty(hwnd, path.join(__dirname, "..", "package.json"));
+        shell.openFileProperty(hwnd, path.join(__dirname, "..", "package.json"));
     } else {
-        fs2.openPath(hwnd, path.join(__dirname, "..", "package.json"));
+        shell.openPath(hwnd, path.join(__dirname, "..", "package.json"));
     }
 };
 
+const openWith = false;
 const openwith = () => {
     const hwndBuffer = win.getNativeWindowHandle();
     let hwnd = 0;
@@ -145,7 +146,11 @@ const openwith = () => {
         hwnd = hwndBuffer.readInt32BE();
     }
 
-    fs2.openPathWith(hwnd, path.join(__dirname, "..", "package.json"));
+    if (openWith) {
+        shell.openPathWith(hwnd, path.join(__dirname, "..", "package.json"));
+    } else {
+        shell.showItemInFolder(path.join(__dirname, "..", "package.json"));
+    }
 };
 
 app.whenReady().then(async () => {
