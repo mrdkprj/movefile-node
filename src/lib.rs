@@ -17,118 +17,6 @@ use std::{
 static UUID: AtomicU32 = AtomicU32::new(0);
 static CALLBACKS: Lazy<Mutex<HashMap<u32, neon::handle::Root<JsFunction>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub fn list_volumes(mut cx: FunctionContext) -> JsResult<JsArray> {
-    match nonstd::fs::list_volumes() {
-        Ok(volumes) => {
-            let arr = cx.empty_array();
-            for (i, volume) in volumes.iter().enumerate() {
-                let obj = cx.empty_object();
-                let a = cx.string(&volume.mount_point);
-                obj.set(&mut cx, "mountPoint", a)?;
-                let a = cx.string(&volume.volume_label);
-                obj.set(&mut cx, "volumeLabel", a)?;
-                let a = cx.number(volume.available_units as f64);
-                obj.set(&mut cx, "availableUnits", a)?;
-                let a = cx.number(volume.total_units as f64);
-                obj.set(&mut cx, "totalUnits", a)?;
-                arr.set(&mut cx, i as u32, obj)?;
-            }
-            Ok(arr)
-        }
-        Err(e) => cx.throw_error(e),
-    }
-}
-
-pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
-    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    match nonstd::fs::get_file_attribute(&file_path) {
-        Ok(att) => {
-            let obj = cx.empty_object();
-            let a = cx.boolean(att.directory);
-            obj.set(&mut cx, "directory", a)?;
-            let a = cx.boolean(att.read_only);
-            obj.set(&mut cx, "readOnly", a)?;
-            let a = cx.boolean(att.hidden);
-            obj.set(&mut cx, "hidden", a)?;
-            let a = cx.boolean(att.system);
-            obj.set(&mut cx, "system", a)?;
-            let a = cx.boolean(att.device);
-            obj.set(&mut cx, "device", a)?;
-            let a = cx.number(att.ctime);
-            obj.set(&mut cx, "ctime", a)?;
-            let a = cx.number(att.mtime);
-            obj.set(&mut cx, "mtime", a)?;
-            let a = cx.number(att.atime);
-            obj.set(&mut cx, "atime", a)?;
-            let a = cx.number(att.size as f64);
-            obj.set(&mut cx, "size", a)?;
-            Ok(obj)
-        }
-        Err(e) => cx.throw_error(e),
-    }
-}
-
-pub fn is_text_available(mut cx: FunctionContext) -> JsResult<JsBoolean> {
-    Ok(cx.boolean(nonstd::clipboard::is_text_available()))
-}
-
-pub fn read_text(mut cx: FunctionContext) -> JsResult<JsString> {
-    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    match nonstd::clipboard::read_text(window_handle as isize) {
-        Ok(text) => Ok(cx.string(text)),
-        Err(e) => cx.throw_error(e),
-    }
-}
-
-pub fn write_text(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    let text = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::clipboard::write_text(window_handle as isize, text);
-    Ok(cx.undefined())
-}
-
-pub fn is_uris_available(mut cx: FunctionContext) -> JsResult<JsBoolean> {
-    Ok(cx.boolean(nonstd::clipboard::is_uris_available()))
-}
-
-pub fn read_uris(mut cx: FunctionContext) -> JsResult<JsObject> {
-    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    match nonstd::clipboard::read_uris(window_handle as isize) {
-        Ok(data) => {
-            let obj = cx.empty_object();
-            let a = match data.operation {
-                Operation::Copy => cx.string(String::from("Copy")),
-                Operation::Move => cx.string(String::from("Move")),
-                Operation::None => cx.string(String::from("None")),
-            };
-            obj.set(&mut cx, "operation", a)?;
-            let arr = cx.empty_array();
-            for (i, url) in data.urls.iter().enumerate() {
-                let a = cx.string(url);
-                arr.set(&mut cx, i as u32, a)?;
-            }
-            obj.set(&mut cx, "urls", arr)?;
-            Ok(obj)
-        }
-        Err(e) => cx.throw_error(e),
-    }
-}
-
-pub fn write_uris(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    let files: Vec<String> = cx.argument::<JsArray>(1)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect();
-    let operation_str = cx.argument::<JsString>(2)?.value(&mut cx);
-    let operation = match operation_str.as_str() {
-        "Copy" => Operation::Copy,
-        "Move" => Operation::Move,
-        _ => Operation::None,
-    };
-
-    nonstd::clipboard::write_uris(window_handle as isize, files.as_slice(), operation).unwrap();
-
-    Ok(cx.undefined())
-}
-
 pub fn reserve_cancellable(mut cx: FunctionContext) -> JsResult<JsNumber> {
     Ok(cx.number(nonstd::fs::reserve_cancellable()))
 }
@@ -331,6 +219,124 @@ pub fn cancel(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     Ok(cx.boolean(result))
 }
 
+pub fn list_volumes(mut cx: FunctionContext) -> JsResult<JsArray> {
+    match nonstd::fs::list_volumes() {
+        Ok(volumes) => {
+            let arr = cx.empty_array();
+            for (i, volume) in volumes.iter().enumerate() {
+                let obj = cx.empty_object();
+                let a = cx.string(&volume.mount_point);
+                obj.set(&mut cx, "mountPoint", a)?;
+                let a = cx.string(&volume.volume_label);
+                obj.set(&mut cx, "volumeLabel", a)?;
+                let a = cx.number(volume.available_units as f64);
+                obj.set(&mut cx, "availableUnits", a)?;
+                let a = cx.number(volume.total_units as f64);
+                obj.set(&mut cx, "totalUnits", a)?;
+                arr.set(&mut cx, i as u32, obj)?;
+            }
+            Ok(arr)
+        }
+        Err(e) => cx.throw_error(e),
+    }
+}
+
+pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    match nonstd::fs::get_file_attribute(&file_path) {
+        Ok(att) => {
+            let attrs = cx.empty_object();
+
+            let a = cx.boolean(att.is_device);
+            attrs.set(&mut cx, "isDevice", a)?;
+            let a = cx.boolean(att.is_directory);
+            attrs.set(&mut cx, "isDirectory", a)?;
+            let a = cx.boolean(att.is_file);
+            attrs.set(&mut cx, "isFile", a)?;
+            let a = cx.boolean(att.is_hidden);
+            attrs.set(&mut cx, "isHidden", a)?;
+            let a = cx.boolean(att.is_read_only);
+            attrs.set(&mut cx, "isReadOnly", a)?;
+            let a = cx.boolean(att.is_symbolic_link);
+            attrs.set(&mut cx, "isSymbolicLink", a)?;
+            let a = cx.boolean(att.is_system);
+            attrs.set(&mut cx, "isSystem", a)?;
+            let a = cx.number(att.atime);
+            attrs.set(&mut cx, "atime", a)?;
+            let a = cx.number(att.ctime);
+            attrs.set(&mut cx, "ctime", a)?;
+            let a = cx.number(att.mtime);
+            attrs.set(&mut cx, "mtime", a)?;
+            let a = cx.number(att.size as f64);
+            attrs.set(&mut cx, "size", a)?;
+
+            Ok(attrs)
+        }
+        Err(e) => cx.throw_error(e),
+    }
+}
+
+pub fn is_text_available(mut cx: FunctionContext) -> JsResult<JsBoolean> {
+    Ok(cx.boolean(nonstd::clipboard::is_text_available()))
+}
+
+pub fn read_text(mut cx: FunctionContext) -> JsResult<JsString> {
+    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
+    match nonstd::clipboard::read_text(window_handle as isize) {
+        Ok(text) => Ok(cx.string(text)),
+        Err(e) => cx.throw_error(e),
+    }
+}
+
+pub fn write_text(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
+    let text = cx.argument::<JsString>(1)?.value(&mut cx);
+    let _ = nonstd::clipboard::write_text(window_handle as isize, text);
+    Ok(cx.undefined())
+}
+
+pub fn is_uris_available(mut cx: FunctionContext) -> JsResult<JsBoolean> {
+    Ok(cx.boolean(nonstd::clipboard::is_uris_available()))
+}
+
+pub fn read_uris(mut cx: FunctionContext) -> JsResult<JsObject> {
+    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
+    match nonstd::clipboard::read_uris(window_handle as isize) {
+        Ok(data) => {
+            let obj = cx.empty_object();
+            let a = match data.operation {
+                Operation::Copy => cx.string(String::from("Copy")),
+                Operation::Move => cx.string(String::from("Move")),
+                Operation::None => cx.string(String::from("None")),
+            };
+            obj.set(&mut cx, "operation", a)?;
+            let arr = cx.empty_array();
+            for (i, url) in data.urls.iter().enumerate() {
+                let a = cx.string(url);
+                arr.set(&mut cx, i as u32, a)?;
+            }
+            obj.set(&mut cx, "urls", arr)?;
+            Ok(obj)
+        }
+        Err(e) => cx.throw_error(e),
+    }
+}
+
+pub fn write_uris(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
+    let files: Vec<String> = cx.argument::<JsArray>(1)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect();
+    let operation_str = cx.argument::<JsString>(2)?.value(&mut cx);
+    let operation = match operation_str.as_str() {
+        "Copy" => Operation::Copy,
+        "Move" => Operation::Move,
+        _ => Operation::None,
+    };
+
+    nonstd::clipboard::write_uris(window_handle as isize, files.as_slice(), operation).unwrap();
+
+    Ok(cx.undefined())
+}
+
 pub fn trash(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
     let _ = nonstd::shell::trash(file_path);
@@ -364,6 +370,53 @@ pub fn show_item_in_folder(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
+pub fn readdir(mut cx: FunctionContext) -> JsResult<JsArray> {
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let recursive = cx.argument::<JsBoolean>(1)?.value(&mut cx);
+    match nonstd::fs::readdir(file_path, recursive) {
+        Ok(dirents) => {
+            let entries = cx.empty_array();
+            for (i, dirent) in dirents.iter().enumerate() {
+                let obj = cx.empty_object();
+                let a = cx.string(dirent.name.clone());
+                obj.set(&mut cx, "name", a)?;
+                let a = cx.string(dirent.parent_path.clone());
+                obj.set(&mut cx, "parentPath", a)?;
+                let a = cx.string(dirent.full_path.clone());
+                obj.set(&mut cx, "fullPath", a)?;
+                let attrs = cx.empty_object();
+                let a = cx.boolean(dirent.attributes.is_device);
+                attrs.set(&mut cx, "isDevice", a)?;
+                let a = cx.boolean(dirent.attributes.is_directory);
+                attrs.set(&mut cx, "isDirectory", a)?;
+                let a = cx.boolean(dirent.attributes.is_file);
+                attrs.set(&mut cx, "isFile", a)?;
+                let a = cx.boolean(dirent.attributes.is_hidden);
+                attrs.set(&mut cx, "isHidden", a)?;
+                let a = cx.boolean(dirent.attributes.is_read_only);
+                attrs.set(&mut cx, "isReadOnly", a)?;
+                let a = cx.boolean(dirent.attributes.is_symbolic_link);
+                attrs.set(&mut cx, "isSymbolicLink", a)?;
+                let a = cx.boolean(dirent.attributes.is_system);
+                attrs.set(&mut cx, "isSystem", a)?;
+                let a = cx.number(dirent.attributes.atime);
+                attrs.set(&mut cx, "atime", a)?;
+                let a = cx.number(dirent.attributes.ctime);
+                attrs.set(&mut cx, "ctime", a)?;
+                let a = cx.number(dirent.attributes.mtime);
+                attrs.set(&mut cx, "mtime", a)?;
+                let a = cx.number(dirent.attributes.size as f64);
+                attrs.set(&mut cx, "size", a)?;
+                obj.set(&mut cx, "attributes", attrs)?;
+
+                entries.set(&mut cx, i as u32, obj)?;
+            }
+            Ok(entries)
+        }
+        Err(e) => cx.throw_error(e),
+    }
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv", mv)?;
@@ -384,6 +437,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("is_uris_available", is_uris_available)?;
     cx.export_function("is_text_available", is_text_available)?;
     cx.export_function("show_item_in_folder", show_item_in_folder)?;
+    cx.export_function("readdir", readdir)?;
 
     Ok(())
 }

@@ -12,11 +12,13 @@ export type Volume = {
     totalUnits: number;
 };
 export type FileAttribute = {
-    directory: boolean;
-    readOnly: boolean;
-    hidden: boolean;
-    system: boolean;
-    device: boolean;
+    isDevice: boolean;
+    isDirectory: boolean;
+    isFile: boolean;
+    isHidden: boolean;
+    isReadOnly: boolean;
+    isSymbolicLink: boolean;
+    isSystem: boolean;
     atime: number;
     ctime: number;
     mtime: number;
@@ -27,6 +29,13 @@ export type ClipboardOperation = "Copy" | "Move" | "None";
 export type ClipboardData = {
     operation: ClipboardOperation;
     urls: string[];
+};
+
+export type Dirent = {
+    name: string;
+    parentPath: string;
+    fullPath: string;
+    attributes: FileAttribute;
 };
 
 export class fs {
@@ -64,6 +73,10 @@ export class fs {
 
     static getFileAttribute = (filePath: string): FileAttribute => {
         return MoveFile.get_file_attribute(filePath);
+    };
+
+    static readdir = (directory: string, recursive: boolean): Dirent[] => {
+        return MoveFile.readdir(directory, recursive);
     };
 }
 

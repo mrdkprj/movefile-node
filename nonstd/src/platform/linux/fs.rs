@@ -49,6 +49,39 @@ pub fn list_volumes() -> Result<Vec<Volume>, String> {
     Ok(volumes)
 }
 
+pub fn readdir(directory: String, recursive: bool) -> Result<Vec<Dirent>, String> {
+    let path = PathBuf::from(directory);
+    if !path.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut entries = Vec::new();
+    try_readdir(path, &mut entries, recursive).unwrap();
+
+    Ok(entries)
+}
+
+fn try_readdir(dir: PathBuf, entries: &mut Vec<Dirent>, recursive: bool) -> std::io::Result<&mut Vec<Dirent>> {
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        if entry.path().is_dir() && recursive {
+            try_readdir(entry.path(), entries, recursive)?;
+        }
+
+        let path = entry.path();
+        entries.push(Dirent {
+            is_directory: path.is_dir(),
+            is_file: path.is_file(),
+            is_symbolic_link: path.is_symlink(),
+            name: entry.file_name().to_string_lossy().to_string(),
+            parent_path: path.parent().unwrap_or(Path::new("")).to_string_lossy().to_string(),
+            full_path: entry.path().to_string_lossy().to_string(),
+        });
+    }
+
+    Ok(entries)
+}
+
 pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
     let file = File::for_parse_name(file_path);
     let info = file.query_info("standard::*", FileQueryInfoFlags::NONE, Cancellable::NONE).unwrap();

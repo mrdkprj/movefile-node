@@ -22,8 +22,21 @@ const createWindow = () => {
 
     win.loadFile("index.html");
 
-    const vols = fs2.listVolumes();
-    console.log(vols);
+    // const vols = fs2.listVolumes();
+    // console.log(vols);
+
+    let s = new Date().getTime();
+    const x = fs.readdirSync(__dirname, { withFileTypes: true, recursive: true });
+
+    console.log(x.length);
+    console.log(new Date().getTime() - s);
+
+    s = new Date().getTime();
+    const entries = fs2.readdir(__dirname, true);
+
+    console.log(entries.length);
+    console.log(new Date().getTime() - s);
+    // entries.forEach((entry) => console.log(entry.fullPath));
 
     // const hwndBuffer = win.getNativeWindowHandle();
     // let hwnd = 0;
@@ -91,7 +104,7 @@ const append = () => {
                     console.log(s.size);
                     console.log(x.size);
                 }
-                return !x.system;
+                return !x.isSystem;
             } catch (ex: any) {
                 console.log(path.join(directory, dirent.name));
                 return true;

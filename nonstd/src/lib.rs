@@ -14,11 +14,13 @@ pub struct Volume {
 
 #[derive(Debug, Clone)]
 pub struct FileAttribute {
-    pub directory: bool,
-    pub read_only: bool,
-    pub hidden: bool,
-    pub system: bool,
-    pub device: bool,
+    pub is_directory: bool,
+    pub is_read_only: bool,
+    pub is_hidden: bool,
+    pub is_system: bool,
+    pub is_device: bool,
+    pub is_symbolic_link: bool,
+    pub is_file: bool,
     pub ctime: f64,
     pub mtime: f64,
     pub atime: f64,
@@ -36,4 +38,12 @@ pub enum Operation {
 pub struct ClipboardData {
     pub operation: Operation,
     pub urls: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Dirent {
+    pub name: String,
+    pub parent_path: String,
+    pub full_path: String,
+    pub attributes: FileAttribute,
 }

@@ -1,11 +1,11 @@
 use super::util::{decode_wide, encode_wide, prefixed};
-use crate::{FileAttribute, Volume};
+use crate::{Dirent, FileAttribute, Volume};
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
     ffi::c_void,
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU32, Ordering},
         Mutex,
@@ -16,10 +16,10 @@ use windows::{
     Win32::{
         Foundation::{HANDLE, MAX_PATH},
         Storage::FileSystem::{
-            DeleteFileW, FindClose, FindExInfoBasic, FindExSearchNameMatch, FindFirstFileExW, FindFirstVolumeW, FindNextVolumeW, FindVolumeClose, GetDiskFreeSpaceExW, GetFileAttributesW,
-            GetVolumeInformationW, GetVolumePathNamesForVolumeNameW, MoveFileExW, MoveFileWithProgressW, FILE_ATTRIBUTE_DEVICE, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_HIDDEN,
-            FILE_ATTRIBUTE_READONLY, FILE_ATTRIBUTE_SYSTEM, FIND_FIRST_EX_FLAGS, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
-            WIN32_FIND_DATAW,
+            DeleteFileW, FindClose, FindExInfoBasic, FindExSearchNameMatch, FindFirstFileExW, FindFirstVolumeW, FindNextFileW, FindNextVolumeW, FindVolumeClose, GetDiskFreeSpaceExW,
+            GetFileAttributesW, GetVolumeInformationW, GetVolumePathNamesForVolumeNameW, MoveFileExW, MoveFileWithProgressW, FILE_ATTRIBUTE_DEVICE, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_HIDDEN,
+            FILE_ATTRIBUTE_READONLY, FILE_ATTRIBUTE_REPARSE_POINT, FILE_ATTRIBUTE_SYSTEM, FIND_FIRST_EX_FLAGS, LPPROGRESS_ROUTINE_CALLBACK_REASON, MOVEFILE_COPY_ALLOWED, MOVEFILE_REPLACE_EXISTING,
+            MOVEFILE_WRITE_THROUGH, WIN32_FIND_DATAW,
         },
     },
 };
@@ -85,20 +85,9 @@ pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
 
     let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
     let handle = unsafe { FindFirstFileExW(path, FindExInfoBasic, &mut data as *mut _ as _, FindExSearchNameMatch, None, FIND_FIRST_EX_FLAGS(0)).map_err(|e| e.message()) }?;
-    let attributes = data.dwFileAttributes;
     unsafe { FindClose(handle).map_err(|e| e.message()) }?;
 
-    Ok(FileAttribute {
-        directory: attributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0,
-        read_only: attributes & FILE_ATTRIBUTE_READONLY.0 != 0,
-        hidden: attributes & FILE_ATTRIBUTE_HIDDEN.0 != 0,
-        system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,
-        device: attributes & FILE_ATTRIBUTE_DEVICE.0 != 0,
-        ctime: to_msecs(data.ftCreationTime.dwLowDateTime, data.ftCreationTime.dwHighDateTime),
-        mtime: to_msecs(data.ftLastWriteTime.dwLowDateTime, data.ftLastWriteTime.dwHighDateTime),
-        atime: to_msecs(data.ftLastAccessTime.dwLowDateTime, data.ftLastAccessTime.dwHighDateTime),
-        size: (data.nFileSizeLow as u64) | ((data.nFileSizeHigh as u64) << 32),
-    })
+    Ok(get_attributes(&data))
 }
 
 fn to_msecs(low: u32, high: u32) -> f64 {
@@ -107,6 +96,103 @@ fn to_msecs(low: u32, high: u32) -> f64 {
     let milliseconds = ticks as f64 / 10_000.0; // FILETIME is in 100-nanosecond intervals
 
     milliseconds - windows_epoch
+}
+
+#[derive(PartialEq)]
+enum FileType {
+    Device,
+    Link,
+    Dir,
+    File,
+}
+
+fn get_file_type(attr: u32) -> FileType {
+    if attr & FILE_ATTRIBUTE_DEVICE.0 != 0 {
+        return FileType::Device;
+    }
+    if attr & FILE_ATTRIBUTE_REPARSE_POINT.0 != 0 {
+        return FileType::Link;
+    }
+    if attr & FILE_ATTRIBUTE_DIRECTORY.0 != 0 {
+        return FileType::Dir;
+    }
+
+    FileType::File
+}
+
+fn get_attributes(data: &WIN32_FIND_DATAW) -> FileAttribute {
+    let attributes = data.dwFileAttributes;
+    let file_type = get_file_type(attributes);
+    FileAttribute {
+        is_directory: file_type == FileType::Dir,
+        is_read_only: attributes & FILE_ATTRIBUTE_READONLY.0 != 0,
+        is_hidden: attributes & FILE_ATTRIBUTE_HIDDEN.0 != 0,
+        is_system: attributes & FILE_ATTRIBUTE_SYSTEM.0 != 0,
+        is_device: file_type == FileType::Device,
+        is_file: file_type == FileType::File,
+        is_symbolic_link: file_type == FileType::Link,
+        ctime: to_msecs(data.ftCreationTime.dwLowDateTime, data.ftCreationTime.dwHighDateTime),
+        mtime: to_msecs(data.ftLastWriteTime.dwLowDateTime, data.ftLastWriteTime.dwHighDateTime),
+        atime: to_msecs(data.ftLastAccessTime.dwLowDateTime, data.ftLastAccessTime.dwHighDateTime),
+        size: (data.nFileSizeLow as u64) | ((data.nFileSizeHigh as u64) << 32),
+    }
+}
+
+pub fn readdir(directory: String, recursive: bool) -> Result<Vec<Dirent>, String> {
+    let mut entries = Vec::new();
+
+    let mut path = PathBuf::from(directory.clone());
+    if !path.is_dir() {
+        return Ok(entries);
+    }
+    path.push("*");
+
+    let wide = encode_wide(prefixed(path.to_str().unwrap()));
+    let path = PCWSTR::from_raw(wide.as_ptr());
+    let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
+    let handle = unsafe { FindFirstFileExW(path, FindExInfoBasic, &mut data as *mut _ as _, FindExSearchNameMatch, None, FIND_FIRST_EX_FLAGS(0)).map_err(|e| e.message()) }?;
+
+    if handle.is_invalid() {
+        return Ok(entries);
+    }
+
+    try_readdir(handle, directory.clone(), &mut entries, recursive).unwrap();
+
+    Ok(entries)
+}
+
+fn try_readdir(handle: HANDLE, parent: String, entries: &mut Vec<Dirent>, recursive: bool) -> Result<&mut Vec<Dirent>, String> {
+    let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
+
+    while unsafe { FindNextFileW(handle, &mut data) }.is_ok() {
+        let name = decode_wide(&data.cFileName);
+        if name == "." || name == ".." {
+            continue;
+        }
+
+        let mut full_path = PathBuf::from(&parent);
+        full_path.push(name.clone());
+
+        entries.push(Dirent {
+            name: decode_wide(&data.cFileName),
+            parent_path: full_path.parent().unwrap().to_string_lossy().to_string(),
+            full_path: full_path.to_string_lossy().to_string(),
+            attributes: get_attributes(&data),
+        });
+
+        if data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0 && recursive {
+            let next_parent = full_path.to_string_lossy().to_string();
+            full_path.push("*");
+            let wide = encode_wide(prefixed(full_path.to_str().unwrap()));
+            let path = PCWSTR::from_raw(wide.as_ptr());
+            let next_handle = unsafe { FindFirstFileExW(path, FindExInfoBasic, &mut data as *mut _ as _, FindExSearchNameMatch, None, FIND_FIRST_EX_FLAGS(0)).map_err(|e| e.message()) }?;
+            try_readdir(next_handle, next_parent, entries, recursive)?;
+        }
+    }
+
+    unsafe { FindClose(handle).map_err(|e| e.message()) }?;
+
+    Ok(entries)
 }
 
 struct ProgressData<'a> {

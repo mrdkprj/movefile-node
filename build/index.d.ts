@@ -19,6 +19,7 @@ declare namespace MoveFile {
     function is_uris_available():boolean;
     function read_uris(windowHandle:number):any;
     function write_uris(windowHandle:number, fullPaths:string[], operation:string):void;
+    function readdir(directory:string, recursive:boolean):any[];
 }
 
 export = MoveFile;
