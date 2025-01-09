@@ -174,16 +174,18 @@ fn try_readdir(handle: HANDLE, parent: String, entries: &mut Vec<Dirent>, recurs
         full_path.push(name.clone());
 
         entries.push(Dirent {
-            name: decode_wide(&data.cFileName),
-            parent_path: full_path.parent().unwrap().to_string_lossy().to_string(),
+            name: name.clone(),
+            parent_path: parent.clone(),
             full_path: full_path.to_string_lossy().to_string(),
             attributes: get_attributes(&data),
         });
 
         if data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0 && recursive {
-            let next_parent = full_path.to_string_lossy().to_string();
-            full_path.push("*");
-            let wide = encode_wide(prefixed(full_path.to_str().unwrap()));
+            let mut next_path = PathBuf::from(&parent);
+            next_path.push(name);
+            let next_parent = next_path.to_string_lossy().to_string();
+            next_path.push("*");
+            let wide = encode_wide(prefixed(next_path.to_str().unwrap()));
             let path = PCWSTR::from_raw(wide.as_ptr());
             let next_handle = unsafe { FindFirstFileExW(path, FindExInfoBasic, &mut data as *mut _ as _, FindExSearchNameMatch, None, FIND_FIRST_EX_FLAGS(0)).map_err(|e| e.message()) }?;
             try_readdir(next_handle, next_parent, entries, recursive)?;

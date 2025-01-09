@@ -26,13 +26,15 @@ const createWindow = () => {
     // console.log(vols);
 
     let s = new Date().getTime();
-    const x = fs.readdirSync(__dirname, { withFileTypes: true, recursive: true });
+    // const x = fs.readdirSync(__dirname, { withFileTypes: true, recursive: true });
+    const x = fs.readdirSync("F:\\", { withFileTypes: true, recursive: true });
 
     console.log(x.length);
     console.log(new Date().getTime() - s);
 
     s = new Date().getTime();
-    const entries = fs2.readdir(__dirname, true);
+    // const entries = fs2.readdir(__dirname, true);
+    const entries = fs2.readdir("F:\\", true);
 
     console.log(entries.length);
     console.log(new Date().getTime() - s);
