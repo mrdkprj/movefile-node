@@ -3,8 +3,9 @@ mod platform;
 pub use platform::linux::*;
 #[cfg(target_os = "windows")]
 pub use platform::windows::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Volume {
     pub mount_point: String,
     pub volume_label: String,
@@ -12,7 +13,7 @@ pub struct Volume {
     pub total_units: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileAttribute {
     pub is_directory: bool,
     pub is_read_only: bool,
@@ -27,20 +28,20 @@ pub struct FileAttribute {
     pub size: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Operation {
     None,
     Copy,
     Move,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClipboardData {
     pub operation: Operation,
     pub urls: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Dirent {
     pub name: String,
     pub parent_path: String,

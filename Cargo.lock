@@ -730,6 +730,7 @@ dependencies = [
  "gio",
  "gtk",
  "once_cell",
+ "serde",
  "windows",
  "windows-core",
 ]

@@ -85,9 +85,10 @@ pub fn get_file_attribute(file_path: &str) -> Result<FileAttribute, String> {
 
     let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
     let handle = unsafe { FindFirstFileExW(path, FindExInfoBasic, &mut data as *mut _ as _, FindExSearchNameMatch, None, FIND_FIRST_EX_FLAGS(0)).map_err(|e| e.message()) }?;
+    let file_attribute = get_attributes(&data);
     unsafe { FindClose(handle).map_err(|e| e.message()) }?;
 
-    Ok(get_attributes(&data))
+    Ok(file_attribute)
 }
 
 fn to_msecs(low: u32, high: u32) -> f64 {

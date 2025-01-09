@@ -28,7 +28,12 @@ const createWindow = () => {
     let s = new Date().getTime();
     // const x = fs.readdirSync(__dirname, { withFileTypes: true, recursive: true });
     const x = fs.readdirSync("F:\\", { withFileTypes: true, recursive: true });
-
+    x.forEach((a) => {
+        const y = fs2.getFileAttribute(path.join(a.parentPath, a.name));
+        if (y.isSystem || y.isHidden || y.isSymbolicLink) {
+            console.log(a.name);
+        }
+    });
     console.log(x.length);
     console.log(new Date().getTime() - s);
 
