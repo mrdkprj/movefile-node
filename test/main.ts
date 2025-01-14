@@ -173,7 +173,7 @@ const openwith = () => {
 
 const content = () => {
     const x = path.join(__dirname, "..", "package.json");
-    const type = fs2.getContentType(x);
+    const type = fs2.getMimeType(x);
     console.log(type);
 };
 

@@ -36,6 +36,7 @@ export type Dirent = {
     parentPath: string;
     fullPath: string;
     attributes: FileAttribute;
+    mimeType: string;
 };
 
 export class fs {
@@ -79,8 +80,8 @@ export class fs {
         return MoveFile.readdir(directory, recursive);
     };
 
-    static getContentType = (filePath: string): string => {
-        return MoveFile.get_content_type(filePath);
+    static getMimeType = (filePath: string): string => {
+        return MoveFile.get_mime_type(filePath);
     };
 }
 

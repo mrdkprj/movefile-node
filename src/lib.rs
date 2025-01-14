@@ -339,7 +339,7 @@ pub fn write_uris(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 pub fn trash(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    let _ = nonstd::shell::trash(&file_path);
+    let _ = nonstd::shell::trash(file_path);
     Ok(cx.undefined())
 }
 
@@ -370,16 +370,17 @@ pub fn show_item_in_folder(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
-pub fn get_content_type(mut cx: FunctionContext) -> JsResult<JsString> {
+pub fn get_mime_type(mut cx: FunctionContext) -> JsResult<JsString> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    let content_type = nonstd::fs::get_content_type(&file_path).unwrap_or_default();
+    let content_type = nonstd::fs::get_mime_type(&file_path).unwrap_or_default();
     Ok(cx.string(content_type))
 }
 
 pub fn readdir(mut cx: FunctionContext) -> JsResult<JsArray> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
     let recursive = cx.argument::<JsBoolean>(1)?.value(&mut cx);
-    match nonstd::fs::readdir(file_path, recursive) {
+    let with_mime_type = cx.argument::<JsBoolean>(2)?.value(&mut cx);
+    match nonstd::fs::readdir(file_path, recursive, with_mime_type) {
         Ok(dirents) => {
             let entries = cx.empty_array();
             for (i, dirent) in dirents.iter().enumerate() {
@@ -390,6 +391,8 @@ pub fn readdir(mut cx: FunctionContext) -> JsResult<JsArray> {
                 obj.set(&mut cx, "parentPath", a)?;
                 let a = cx.string(dirent.full_path.clone());
                 obj.set(&mut cx, "fullPath", a)?;
+                let a = cx.string(dirent.mime_type.clone());
+                obj.set(&mut cx, "mimeType", a)?;
                 let attrs = cx.empty_object();
                 let a = cx.boolean(dirent.attributes.is_device);
                 attrs.set(&mut cx, "isDevice", a)?;
@@ -444,7 +447,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("is_text_available", is_text_available)?;
     cx.export_function("show_item_in_folder", show_item_in_folder)?;
     cx.export_function("readdir", readdir)?;
-    cx.export_function("get_content_type", get_content_type)?;
+    cx.export_function("get_mime_type", get_mime_type)?;
 
     Ok(())
 }
