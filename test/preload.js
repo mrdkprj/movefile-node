@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   reload: (s,d) => ipcRenderer.send('reload', s, d),
   open:()  => ipcRenderer.send('open'),
   openwith:()  => ipcRenderer.send('openwith'),
+  content:() => ipcRenderer.send("content"),
   onMyEventName: (callback) => ipcRenderer.on('progress', (_e, ...args) => callback(args)),
 })

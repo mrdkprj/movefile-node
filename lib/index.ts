@@ -78,6 +78,10 @@ export class fs {
     static readdir = (directory: string, recursive: boolean): Dirent[] => {
         return MoveFile.readdir(directory, recursive);
     };
+
+    static getContentType = (filePath: string): string => {
+        return MoveFile.get_content_type(filePath);
+    };
 }
 
 export class shell {

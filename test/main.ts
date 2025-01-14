@@ -26,20 +26,18 @@ const createWindow = () => {
     // console.log(vols);
 
     let s = new Date().getTime();
-    // const x = fs.readdirSync(__dirname, { withFileTypes: true, recursive: true });
-    const x = fs.readdirSync("F:\\", { withFileTypes: true, recursive: true });
-    x.forEach((a) => {
-        const y = fs2.getFileAttribute(path.join(a.parentPath, a.name));
-        if (y.isSystem || y.isHidden || y.isSymbolicLink) {
-            console.log(a.name);
-        }
-    });
+    const x = fs.readdirSync(__dirname, { withFileTypes: true, recursive: true });
+    // x.forEach((a) => {
+    //     const y = fs2.getFileAttribute(path.join(a.parentPath, a.name));
+    //     if (y.isSystem || y.isHidden || y.isSymbolicLink) {
+    //         console.log(a.name);
+    //     }
+    // });
     console.log(x.length);
     console.log(new Date().getTime() - s);
 
     s = new Date().getTime();
-    // const entries = fs2.readdir(__dirname, true);
-    const entries = fs2.readdir("F:\\", true);
+    const entries = fs2.readdir(__dirname, true);
 
     console.log(entries.length);
     console.log(new Date().getTime() - s);
@@ -173,6 +171,12 @@ const openwith = () => {
     }
 };
 
+const content = () => {
+    const x = path.join(__dirname, "..", "package.json");
+    const type = fs2.getContentType(x);
+    console.log(type);
+};
+
 app.whenReady().then(async () => {
     createWindow();
     ipcMain.on("set-title", handleSetTitle);
@@ -181,6 +185,7 @@ app.whenReady().then(async () => {
     ipcMain.on("reload", reload);
     ipcMain.on("open", open);
     ipcMain.on("openwith", openwith);
+    ipcMain.on("content", content);
 });
 
 app.on("window-all-closed", () => {

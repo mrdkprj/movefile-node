@@ -74,7 +74,7 @@ fn spawn_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
         });
     } else {
         async_std::task::spawn(async move {
-            let result = nonstd::fs::mv(source_files.first().unwrap().to_string(), dest_file, None, id);
+            let result = nonstd::fs::mv(source_files.first().unwrap(), dest_file, None, id);
             deferred.settle_with(&channel, |mut cx| match result {
                 Ok(_) => Ok(cx.undefined()),
                 Err(e) => cx.throw_error(e),
@@ -147,7 +147,7 @@ fn listen_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
     } else {
         async_std::task::spawn(async move {
             let result = nonstd::fs::mv(
-                source_files.first().unwrap().to_string(),
+                source_files.first().unwrap(),
                 dest_file,
                 Some(&mut |a, b| {
                     channel.clone().send(move |mut cx| {
@@ -339,35 +339,41 @@ pub fn write_uris(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 pub fn trash(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    let _ = nonstd::shell::trash(file_path);
+    let _ = nonstd::shell::trash(&file_path);
     Ok(cx.undefined())
 }
 
 pub fn open_file_property(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_file_property(window_handle as isize, file_path);
+    let _ = nonstd::shell::open_file_property(window_handle as isize, &file_path);
     Ok(cx.undefined())
 }
 
 pub fn open_path(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_path(window_handle as isize, file_path);
+    let _ = nonstd::shell::open_path(window_handle as isize, &file_path);
     Ok(cx.undefined())
 }
 
 pub fn open_path_with(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_path_with(window_handle as isize, file_path);
+    let _ = nonstd::shell::open_path_with(window_handle as isize, &file_path);
     Ok(cx.undefined())
 }
 
 pub fn show_item_in_folder(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    let _ = nonstd::shell::show_item_in_folder(file_path);
+    let _ = nonstd::shell::show_item_in_folder(&file_path);
     Ok(cx.undefined())
+}
+
+pub fn get_content_type(mut cx: FunctionContext) -> JsResult<JsString> {
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let content_type = nonstd::fs::get_content_type(&file_path).unwrap_or_default();
+    Ok(cx.string(content_type))
 }
 
 pub fn readdir(mut cx: FunctionContext) -> JsResult<JsArray> {
@@ -438,6 +444,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("is_text_available", is_text_available)?;
     cx.export_function("show_item_in_folder", show_item_in_folder)?;
     cx.export_function("readdir", readdir)?;
+    cx.export_function("get_content_type", get_content_type)?;
 
     Ok(())
 }
