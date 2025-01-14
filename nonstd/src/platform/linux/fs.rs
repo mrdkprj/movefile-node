@@ -48,37 +48,44 @@ pub fn list_volumes() -> Result<Vec<Volume>, String> {
     Ok(volumes)
 }
 
-pub fn readdir(directory: impl AsRef<Path>, recursive: bool) -> Result<Vec<Dirent>, String> {
+pub fn readdir<P: AsRef<Path>>(directory: P, recursive: bool, with_mime_type: bool) -> Result<Vec<Dirent>, String> {
     if !directory.as_ref().is_dir() {
         return Ok(Vec::new());
     }
 
     let mut entries = Vec::new();
-    try_readdir(directory, &mut entries, recursive).map_err(|e| e)?;
+    try_readdir(directory, &mut entries, recursive, with_mime_type).map_err(|e| e)?;
 
     Ok(entries)
 }
 
-fn try_readdir(dir: impl AsRef<Path>, entries: &mut Vec<Dirent>, recursive: bool) -> Result<&mut Vec<Dirent>, String> {
+fn try_readdir<P: AsRef<Path>>(dir: P, entries: &mut Vec<Dirent>, recursive: bool, with_mime_type: bool) -> Result<&mut Vec<Dirent>, String> {
     for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         if entry.path().is_dir() && recursive {
-            try_readdir(entry.path(), entries, recursive)?;
+            try_readdir(entry.path(), entries, recursive, with_mime_type)?;
         }
 
         let path = entry.path();
+        let mime_type = if with_mime_type {
+            get_mime_type(&path)?
+        } else {
+            String::new()
+        };
+
         entries.push(Dirent {
             name: entry.file_name().to_string_lossy().to_string(),
             parent_path: path.parent().unwrap_or(Path::new("")).to_string_lossy().to_string(),
             full_path: entry.path().to_string_lossy().to_string(),
             attributes: get_file_attribute(path.to_str().unwrap()).map_err(|e| e)?,
+            mime_type,
         });
     }
 
     Ok(entries)
 }
 
-pub fn get_file_attribute(file_path: impl AsRef<Path>) -> Result<FileAttribute, String> {
+pub fn get_file_attribute<P: AsRef<Path>>(file_path: P) -> Result<FileAttribute, String> {
     let file = File::for_parse_name(file_path.as_ref().to_str().unwrap());
     let info = file.query_info("standard::*", FileQueryInfoFlags::NONE, Cancellable::NONE).unwrap();
 
@@ -97,8 +104,12 @@ pub fn get_file_attribute(file_path: impl AsRef<Path>) -> Result<FileAttribute, 
     })
 }
 
-pub fn get_content_type(file_path: &impl AsRef<Path>) -> Result<String, String> {
-    let (ctype, _) = gio::content_type_guess(Some(file_path), &[0]);
+pub fn get_mime_type<P: AsRef<Path>>(file_path: P) -> Result<String, String> {
+    if !file_path.as_ref().is_file() {
+        return Ok(String::new());
+    }
+
+    let (ctype, _) = gio::content_type_guess(Some(file_path.as_ref().file_name().unwrap()), &[0]);
     Ok(ctype.to_string())
 }
 
@@ -119,13 +130,13 @@ pub fn reserve_cancellable() -> u32 {
     id
 }
 
-pub fn mv(source_file: impl AsRef<Path>, dest_file: impl AsRef<Path>, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+pub fn mv<P: AsRef<Path>, P2: AsRef<Path>>(source_file: P, dest_file: P2, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let result = inner_move(source_file, dest_file, callback, cancel_id);
     clean_up(cancel_id);
     result
 }
 
-fn inner_move(source_file: impl AsRef<Path>, dest_file: impl AsRef<Path>, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+fn inner_move<P: AsRef<Path>, P2: AsRef<Path>>(source_file: P, dest_file: P2, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let source = File::for_parse_name(source_file.as_ref().to_str().unwrap());
     let dest = File::for_parse_name(dest_file.as_ref().to_str().unwrap());
 
@@ -146,13 +157,13 @@ fn inner_move(source_file: impl AsRef<Path>, dest_file: impl AsRef<Path>, callba
     Ok(())
 }
 
-pub fn mv_all(source_files: Vec<impl AsRef<Path>>, dest_dir: impl AsRef<Path>, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+pub fn mv_all<P: AsRef<Path>, P2: AsRef<Path>>(source_files: Vec<P>, dest_dir: P2, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let result = inner_mv_bulk(source_files, dest_dir, callback, cancel_id);
     clean_up(cancel_id);
     result
 }
 
-fn inner_mv_bulk(source_files: Vec<impl AsRef<Path>>, dest_dir: impl AsRef<Path>, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
+fn inner_mv_bulk<P: AsRef<Path>, P2: AsRef<Path>>(source_files: Vec<P>, dest_dir: P2, callback: Option<&mut dyn FnMut(i64, i64)>, cancel_id: Option<u32>) -> Result<(), String> {
     let sources: Vec<File> = source_files.iter().map(|f| File::for_parse_name(f.as_ref().to_str().unwrap())).collect();
 
     if dest_dir.as_ref().is_file() {

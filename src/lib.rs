@@ -346,33 +346,33 @@ pub fn trash(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 pub fn open_file_property(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_file_property(window_handle as isize, &file_path);
+    let _ = nonstd::shell::open_file_property(window_handle as isize, file_path);
     Ok(cx.undefined())
 }
 
 pub fn open_path(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_path(window_handle as isize, &file_path);
+    let _ = nonstd::shell::open_path(window_handle as isize, file_path);
     Ok(cx.undefined())
 }
 
 pub fn open_path_with(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_path_with(window_handle as isize, &file_path);
+    let _ = nonstd::shell::open_path_with(window_handle as isize, file_path);
     Ok(cx.undefined())
 }
 
 pub fn show_item_in_folder(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    let _ = nonstd::shell::show_item_in_folder(&file_path);
+    let _ = nonstd::shell::show_item_in_folder(file_path);
     Ok(cx.undefined())
 }
 
 pub fn get_mime_type(mut cx: FunctionContext) -> JsResult<JsString> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    let content_type = nonstd::fs::get_mime_type(&file_path).unwrap_or_default();
+    let content_type = nonstd::fs::get_mime_type(file_path).unwrap_or_default();
     Ok(cx.string(content_type))
 }
 
