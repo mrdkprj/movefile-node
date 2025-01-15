@@ -37,7 +37,7 @@ const createWindow = () => {
     console.log(new Date().getTime() - s);
 
     s = new Date().getTime();
-    const entries = fs2.readdir(__dirname, true, true);
+    const entries = fs2.readdir(__dirname, true, false);
 
     console.log(entries.length);
     console.log(new Date().getTime() - s);
@@ -172,9 +172,10 @@ const openwith = () => {
 };
 
 const content = () => {
-    const x = path.join(__dirname, "..", "package.json");
-    const type = fs2.getMimeType(x);
-    console.log(type);
+    ["a.mp4", "a.json", "a.js", "a.ts", "a.mov"].forEach((e) => {
+        const type = fs2.getMimeType(e);
+        console.log(type);
+    });
 };
 
 app.whenReady().then(async () => {
