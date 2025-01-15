@@ -203,7 +203,14 @@ fn try_readdir<P: AsRef<Path>>(handle: HANDLE, parent: P, entries: &mut Vec<Dire
         full_path.push(name.clone());
 
         let mime_type = if with_mime_type {
-            get_mime_type(&name)?
+            match get_mime_type(&name) {
+                Ok(n) => n,
+                Err(e) => {
+                    println!("{:?}", e);
+                    println!("{:?}", name);
+                    String::new()
+                }
+            }
         } else {
             String::new()
         };
@@ -224,7 +231,9 @@ fn try_readdir<P: AsRef<Path>>(handle: HANDLE, parent: P, entries: &mut Vec<Dire
             let wide = encode_wide(prefixed(search_path));
             let path = PCWSTR::from_raw(wide.as_ptr());
             let next_handle = unsafe { FindFirstFileExW(path, FindExInfoBasic, &mut data as *mut _ as _, FindExSearchNameMatch, None, FIND_FIRST_EX_FLAGS(0)).map_err(|e| e.message()) }?;
-            try_readdir(next_handle, next_parent, entries, recursive, with_mime_type)?;
+            if !next_handle.is_invalid() {
+                try_readdir(next_handle, next_parent, entries, recursive, with_mime_type)?;
+            }
         }
     }
 

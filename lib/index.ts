@@ -76,8 +76,8 @@ export class fs {
         return MoveFile.get_file_attribute(filePath);
     };
 
-    static readdir = (directory: string, recursive: boolean): Dirent[] => {
-        return MoveFile.readdir(directory, recursive);
+    static readdir = (directory: string, recursive: boolean, withMimeType: boolean): Dirent[] => {
+        return MoveFile.readdir(directory, recursive, withMimeType);
     };
 
     static getMimeType = (filePath: string): string => {

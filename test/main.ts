@@ -37,7 +37,7 @@ const createWindow = () => {
     console.log(new Date().getTime() - s);
 
     s = new Date().getTime();
-    const entries = fs2.readdir(__dirname, true);
+    const entries = fs2.readdir(__dirname, true, true);
 
     console.log(entries.length);
     console.log(new Date().getTime() - s);
