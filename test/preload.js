@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   open:()  => ipcRenderer.send('open'),
   openwith:()  => ipcRenderer.send('openwith'),
   content:() => ipcRenderer.send("content"),
+  draggable:() => ipcRenderer.send("draggable"),
   onMyEventName: (callback) => ipcRenderer.on('progress', (_e, ...args) => callback(args)),
 })

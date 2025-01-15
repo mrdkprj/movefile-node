@@ -17,7 +17,7 @@ use windows::{
 
 pub fn start_drag(file_paths: Vec<String>, operation: Operation) -> Result<(), String> {
     let _ = ComGuard::new();
-
+    println!("{:?}", file_paths);
     let pidls: Vec<*const ITEMIDLIST> = file_paths
         .iter()
         .map(|path| {
@@ -51,7 +51,7 @@ pub fn start_drag(file_paths: Vec<String>, operation: Operation) -> Result<(), S
     let file_list_size = file_list.len() * std::mem::size_of::<u16>();
 
     let hglobal = unsafe { GlobalAlloc(GMEM_MOVEABLE, total_size).map_err(|e| e.message()) }?;
-
+    //unsafe precondition(s) violated: ptr::copy_nonoverlapping requires that both pointer arguments are aligned and non-null and the specified memory ranges do not overlap
     // Lock the memory to write to it
     let ptr = unsafe { GlobalLock(hglobal) } as *mut u8;
     if ptr.is_null() {
@@ -66,11 +66,11 @@ pub fn start_drag(file_paths: Vec<String>, operation: Operation) -> Result<(), S
         fWide: true.into(),
     };
     unsafe { std::ptr::copy_nonoverlapping(&dropfiles as *const _ as *const u8, ptr, dropfiles_size) };
-
+    println!("1");
     // Write the file list as wide characters (UTF-16)
     let wide_file_list: Vec<u16> = file_list.encode_utf16().collect();
     unsafe { std::ptr::copy_nonoverlapping(wide_file_list.as_ptr() as *const u8, ptr.add(dropfiles_size), file_list_size) };
-
+    println!("2");
     let _ = unsafe { GlobalUnlock(hglobal) };
 
     // Set the data in the IDataObject

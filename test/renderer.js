@@ -56,6 +56,14 @@ window.onload = () => {
 
     })
 
+    document.getElementById("draggable").addEventListener("dragstart", (e) => {
+        e.preventDefault();
+
+        window.electronAPI.draggable();
+    })
+
+
+    document.addEventListener("dragover", e => e.preventDefault());
     // document.getElementById("multi").addEventListener("click", () => {
     //     if(navigator.userAgent.includes("Linux")) {
     //         window.electronAPI.reload(["/mnt/d/2023.mp4","/mnt/d/2024.mp4"], "/mnt/c/DevProjects");
@@ -71,3 +79,4 @@ window.onload = () => {
     //     }
     // })
 }
+

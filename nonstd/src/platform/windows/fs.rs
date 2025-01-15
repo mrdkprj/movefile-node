@@ -301,7 +301,7 @@ fn inner_mv_bulk<P: AsRef<Path>>(source_files: Vec<P>, dest_dir: P, callback: Op
 
         for i in 0..source_files.len() {
             let source_file = source_files.get(i).unwrap();
-            let metadata = fs::metadata(&source_file).unwrap();
+            let metadata = fs::metadata(source_file).unwrap();
             total += metadata.len() as i64;
             let name = source_file.as_ref().file_name().unwrap();
             let dest_file = dest_dir.as_ref().join(name);
@@ -392,7 +392,7 @@ fn move_fallback<P: AsRef<Path>, P2: AsRef<Path>>(source_file: P, dest_file: P2)
 
 fn handel_error<P: AsRef<Path>>(e: Error, file: P, treat_cancel_as_error: bool) -> Result<bool, String> {
     if e.code() != CANCEL_ERROR_CODE {
-        return Err(format!("File: {}, Message: {}", file.as_ref().to_string_lossy().to_string(), e.message()));
+        return Err(format!("File: {}, Message: {}", file.as_ref().to_string_lossy(), e.message()));
     }
 
     if treat_cancel_as_error && e.code() == CANCEL_ERROR_CODE {

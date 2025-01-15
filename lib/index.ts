@@ -132,3 +132,9 @@ export class clipboard {
         return MoveFile.write_uris(windowHandle, fullPaths, operation);
     };
 }
+
+export class drag {
+    static startDrag = (paths: string[]) => {
+        return MoveFile.start_drag(paths);
+    };
+}

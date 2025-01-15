@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 import os from "os";
 import path from "path";
 import fs from "fs";
-import { fs as fs2, clipboard, Progress, shell } from "../lib/index";
+import { fs as fs2, clipboard, Progress, shell, drag } from "../lib/index";
 
 let sync = false;
 let win: BrowserWindow;
@@ -178,6 +178,13 @@ const content = () => {
     });
 };
 
+const draggable = () => {
+    const f = "";
+    const a = [path.join(f, "a.mp4"), path.join(f, "b.mp4"), path.join(f, "c.mp4")];
+    console.log(a);
+    drag.startDrag(a);
+};
+
 app.whenReady().then(async () => {
     createWindow();
     ipcMain.on("set-title", handleSetTitle);
@@ -187,6 +194,7 @@ app.whenReady().then(async () => {
     ipcMain.on("open", open);
     ipcMain.on("openwith", openwith);
     ipcMain.on("content", content);
+    ipcMain.on("draggable", draggable);
 });
 
 app.on("window-all-closed", () => {

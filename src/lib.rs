@@ -426,6 +426,12 @@ pub fn readdir(mut cx: FunctionContext) -> JsResult<JsArray> {
     }
 }
 
+fn start_drag(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let files: Vec<String> = cx.argument::<JsArray>(0)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect();
+    nonstd::drag_drop::start_drag(files, Operation::Copy).unwrap();
+    Ok(cx.undefined())
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv", mv)?;
@@ -448,6 +454,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("show_item_in_folder", show_item_in_folder)?;
     cx.export_function("readdir", readdir)?;
     cx.export_function("get_mime_type", get_mime_type)?;
+    cx.export_function("start_drag", start_drag)?;
 
     Ok(())
 }

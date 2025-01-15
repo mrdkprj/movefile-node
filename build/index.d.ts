@@ -21,6 +21,7 @@ declare namespace MoveFile {
     function write_uris(windowHandle:number, fullPaths:string[], operation:string):void;
     function readdir(directory:string, recursive:boolean, withMimeType:boolean):any[];
     function get_mime_type(filePath:string):string;
+    function start_drag(paths:string[]):void;
 }
 
 export = MoveFile;
