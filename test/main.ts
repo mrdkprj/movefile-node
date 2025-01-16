@@ -37,7 +37,7 @@ const createWindow = () => {
     console.log(new Date().getTime() - s);
 
     s = new Date().getTime();
-    const entries = fs2.readdir(__dirname, true, false);
+    const entries = fs2.readdir(__dirname, true, true);
 
     console.log(entries.length);
     console.log(new Date().getTime() - s);
@@ -134,7 +134,7 @@ const toggle = () => {
     } else {
         hwnd = hwndBuffer.readInt32BE();
     }
-    clipboard.writeUris(hwnd, [path.join(__dirname, "..", "package.json"), path.join(__dirname, "..", "tsconfig.json")], "Move");
+    clipboard.writeUris(hwnd, [path.join(__dirname, "..", "package.json"), path.join(__dirname, "..", "tsconfig.json")], "Copy");
 };
 
 const openprop = false;
@@ -179,7 +179,7 @@ const content = () => {
 };
 
 const draggable = () => {
-    const f = "";
+    const f = __dirname;
     const a = [path.join(f, "a.mp4"), path.join(f, "b.mp4"), path.join(f, "c.mp4")];
     console.log(a);
     drag.startDrag(a);

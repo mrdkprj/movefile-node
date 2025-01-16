@@ -1,5 +1,5 @@
-use super::util::{encode_wide, global_free, ComGuard};
-use crate::Operation;
+use super::util::{encode_wide, ComGuard};
+use crate::{platform::windows::util::GlobalMemory, Operation};
 use std::mem::ManuallyDrop;
 use windows::{
     core::{implement, HRESULT, PCWSTR},
@@ -7,7 +7,6 @@ use windows::{
         Foundation::*,
         System::{
             Com::{IDataObject, DVASPECT_CONTENT, FORMATETC, STGMEDIUM, STGMEDIUM_0, TYMED_HGLOBAL},
-            Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
             Ole::{DoDragDrop, IDropSource, IDropSource_Impl, CF_HDROP, DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_NONE},
             SystemServices::{MK_LBUTTON, MODIFIERKEYS_FLAGS},
         },
@@ -17,7 +16,7 @@ use windows::{
 
 pub fn start_drag(file_paths: Vec<String>, operation: Operation) -> Result<(), String> {
     let _ = ComGuard::new();
-    println!("{:?}", file_paths);
+
     let pidls: Vec<*const ITEMIDLIST> = file_paths
         .iter()
         .map(|path| {
@@ -46,18 +45,12 @@ pub fn start_drag(file_paths: Vec<String>, operation: Operation) -> Result<(), S
     // Double null terminator
     total_size += 2;
 
-    // Calculate the size needed for the DROPFILES structure and file list
     let dropfiles_size = std::mem::size_of::<DROPFILES>();
-    let file_list_size = file_list.len() * std::mem::size_of::<u16>();
 
-    let hglobal = unsafe { GlobalAlloc(GMEM_MOVEABLE, total_size).map_err(|e| e.message()) }?;
-    //unsafe precondition(s) violated: ptr::copy_nonoverlapping requires that both pointer arguments are aligned and non-null and the specified memory ranges do not overlap
+    let hglobal = GlobalMemory::new(total_size)?;
+
     // Lock the memory to write to it
-    let ptr = unsafe { GlobalLock(hglobal) } as *mut u8;
-    if ptr.is_null() {
-        global_free(hglobal)?;
-        return Err("Failed to free memory".to_string());
-    }
+    let ptr = hglobal.lock()?;
 
     let dropfiles = DROPFILES {
         pFiles: dropfiles_size as u32,
@@ -65,13 +58,19 @@ pub fn start_drag(file_paths: Vec<String>, operation: Operation) -> Result<(), S
         fNC: false.into(),
         fWide: true.into(),
     };
-    unsafe { std::ptr::copy_nonoverlapping(&dropfiles as *const _ as *const u8, ptr, dropfiles_size) };
-    println!("1");
+
+    unsafe { std::ptr::write(ptr as *mut DROPFILES, dropfiles) };
+
     // Write the file list as wide characters (UTF-16)
     let wide_file_list: Vec<u16> = file_list.encode_utf16().collect();
-    unsafe { std::ptr::copy_nonoverlapping(wide_file_list.as_ptr() as *const u8, ptr.add(dropfiles_size), file_list_size) };
-    println!("2");
-    let _ = unsafe { GlobalUnlock(hglobal) };
+    let dest = unsafe { ptr.add(dropfiles_size) } as *mut u16;
+    let src = wide_file_list.as_ptr();
+    let len = wide_file_list.len();
+    unsafe {
+        std::ptr::copy_nonoverlapping(src, dest, len);
+    };
+
+    hglobal.unlock();
 
     // Set the data in the IDataObject
     let format_etc = FORMATETC {
@@ -85,7 +84,7 @@ pub fn start_drag(file_paths: Vec<String>, operation: Operation) -> Result<(), S
     let stg_medium = STGMEDIUM {
         tymed: TYMED_HGLOBAL.0 as _,
         u: STGMEDIUM_0 {
-            hGlobal: hglobal,
+            hGlobal: hglobal.handle(),
         },
         pUnkForRelease: ManuallyDrop::new(None),
     };
@@ -100,6 +99,10 @@ pub fn start_drag(file_paths: Vec<String>, operation: Operation) -> Result<(), S
     };
 
     let _ = unsafe { DoDragDrop(&data_object, &drop_source, effects, &mut effects) };
+
+    for pidl in &pidls {
+        unsafe { windows::Win32::System::Com::CoTaskMemFree(Some(*pidl as *mut _)) };
+    }
 
     Ok(())
 }
