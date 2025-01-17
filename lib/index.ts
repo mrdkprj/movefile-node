@@ -134,7 +134,7 @@ export class clipboard {
 }
 
 export class drag {
-    static startDrag = (paths: string[]) => {
-        return MoveFile.start_drag(paths);
+    static startDrag = (paths: string[], windowHandle?: number) => {
+        return MoveFile.start_drag(paths, windowHandle ?? 0);
     };
 }
