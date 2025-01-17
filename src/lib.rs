@@ -428,7 +428,15 @@ pub fn readdir(mut cx: FunctionContext) -> JsResult<JsArray> {
 
 fn start_drag(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let files: Vec<String> = cx.argument::<JsArray>(0)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect();
-    nonstd::drag_drop::start_drag(files, Operation::Copy).unwrap();
+    #[cfg(target_os = "linux")]
+    {
+        let window_handle = cx.argument::<JsNumber>(1)?.value(&mut cx);
+        nonstd::drag_drop::start_drag(window_handle as _, files, Operation::Copy).unwrap();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        nonstd::drag_drop::start_drag(files, Operation::Copy).unwrap();
+    }
     Ok(cx.undefined())
 }
 

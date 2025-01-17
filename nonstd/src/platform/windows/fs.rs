@@ -93,16 +93,6 @@ pub fn get_file_attributes<P: AsRef<Path>>(file_path: P) -> Result<FileAttribute
     Ok(file_attributes)
 }
 
-fn to_msecs(low: u32, high: u32) -> f64 {
-    // FILETIME epoch (1601-01-01) to Unix epoch (1970-01-01) in milliseconds
-    let windows_epoch = 11644473600000.0;
-    let ticks = ((high as u64) << 32) | low as u64;
-    // FILETIME is in 100-nanosecond intervals
-    let milliseconds = ticks as f64 / 10_000.0;
-
-    milliseconds - windows_epoch
-}
-
 #[derive(PartialEq)]
 enum FileType {
     Device,
@@ -141,6 +131,16 @@ fn get_attributes(data: &WIN32_FIND_DATAW) -> FileAttribute {
         atime: to_msecs(data.ftLastAccessTime.dwLowDateTime, data.ftLastAccessTime.dwHighDateTime),
         size: (data.nFileSizeLow as u64) | ((data.nFileSizeHigh as u64) << 32),
     }
+}
+
+fn to_msecs(low: u32, high: u32) -> f64 {
+    // FILETIME epoch (1601-01-01) to Unix epoch (1970-01-01) in milliseconds
+    let windows_epoch = 11644473600000.0;
+    let ticks = ((high as u64) << 32) | low as u64;
+    // FILETIME is in 100-nanosecond intervals
+    let milliseconds = ticks as f64 / 10_000.0;
+
+    milliseconds - windows_epoch
 }
 
 pub fn get_mime_type<P: AsRef<Path>>(file_path: P) -> Result<String, String> {

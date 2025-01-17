@@ -41,6 +41,9 @@ const createWindow = () => {
 
     console.log(entries.length);
     console.log(new Date().getTime() - s);
+    console.log(entries[0]);
+    const stat = fs.statSync(entries[0].fullPath);
+    console.log(stat);
     // entries.forEach((entry) => console.log(entry.fullPath));
 
     // const hwndBuffer = win.getNativeWindowHandle();
@@ -180,9 +183,15 @@ const content = () => {
 
 const draggable = () => {
     const f = __dirname;
-    const a = [path.join(f, "a.mp4"), path.join(f, "b.mp4"), path.join(f, "c.mp4")];
-    console.log(a);
-    drag.startDrag(a);
+    const a = [path.join(f, "main.ts"), path.join(f, "package.json"), path.join(f, "preload.js")];
+    const hwndBuffer = win.getNativeWindowHandle();
+    let hwnd = 0;
+    if (os.endianness() == "LE") {
+        hwnd = hwndBuffer.readInt32LE();
+    } else {
+        hwnd = hwndBuffer.readInt32BE();
+    }
+    drag.startDrag(a, hwnd);
 };
 
 app.whenReady().then(async () => {
