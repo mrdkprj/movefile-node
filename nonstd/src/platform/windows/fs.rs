@@ -81,16 +81,16 @@ pub fn list_volumes() -> Result<Vec<Volume>, String> {
     Ok(volumes)
 }
 
-pub fn get_file_attribute<P: AsRef<Path>>(file_path: P) -> Result<FileAttribute, String> {
+pub fn get_file_attributes<P: AsRef<Path>>(file_path: P) -> Result<FileAttribute, String> {
     let wide = encode_wide(prefixed(file_path.as_ref()));
     let path = PCWSTR::from_raw(wide.as_ptr());
 
     let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
     let handle = unsafe { FindFirstFileExW(path, FindExInfoBasic, &mut data as *mut _ as _, FindExSearchNameMatch, None, FIND_FIRST_EX_FLAGS(0)).map_err(|e| e.message()) }?;
-    let file_attribute = get_attributes(&data);
+    let file_attributes = get_attributes(&data);
     unsafe { FindClose(handle).map_err(|e| e.message()) }?;
 
-    Ok(file_attribute)
+    Ok(file_attributes)
 }
 
 fn to_msecs(low: u32, high: u32) -> f64 {
