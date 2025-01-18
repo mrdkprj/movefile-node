@@ -109,9 +109,10 @@ fn to_file_attribute(info: &FileInfo) -> FileAttribute {
         is_device: info.file_type() == FileType::Mountable,
         is_file: info.file_type() == FileType::Regular,
         is_symbolic_link: info.file_type() == FileType::SymbolicLink,
-        ctime: to_msecs(info.attribute_uint64("time::created"), info.attribute_uint32("time::created-usec")) as _,
-        mtime: to_msecs(info.attribute_uint64("time::modified"), info.attribute_uint32("time::modified-usec")) as _,
-        atime: to_msecs(info.attribute_uint64("time::access"), info.attribute_uint32("time::access-usec")) as _,
+        ctime_ms: to_msecs(info.attribute_uint64("time::changed"), info.attribute_uint32("time::changed-usec")) as _,
+        mtime_ms: to_msecs(info.attribute_uint64("time::modified"), info.attribute_uint32("time::modified-usec")) as _,
+        atime_ms: to_msecs(info.attribute_uint64("time::access"), info.attribute_uint32("time::access-usec")) as _,
+        birthtime_ms: to_msecs(info.attribute_uint64("time::created"), info.attribute_uint32("time::created-usec")) as _,
         size: info.size() as u64,
     }
 }
