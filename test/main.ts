@@ -41,9 +41,11 @@ const createWindow = () => {
 
     console.log(entries.length);
     console.log(new Date().getTime() - s);
-    console.log(entries[0]);
+
     const stat = fs.statSync(entries[0].fullPath);
     console.log(stat);
+    const a = fs2.getFileAttribute(entries[0].fullPath);
+    console.log(a);
     // entries.forEach((entry) => console.log(entry.fullPath));
 
     // const hwndBuffer = win.getNativeWindowHandle();
@@ -106,9 +108,9 @@ const append = () => {
                     const s = fs.statSync(path.join(directory, dirent.name));
                     console.log(path.join(directory, dirent.name));
                     console.log(s.atimeMs);
-                    console.log(x.atime);
+                    console.log(x.atimeMs);
                     console.log(s.mtimeMs);
-                    console.log(x.mtime);
+                    console.log(x.mtimeMs);
                     console.log(s.size);
                     console.log(x.size);
                 }

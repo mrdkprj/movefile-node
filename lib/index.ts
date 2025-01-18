@@ -19,9 +19,10 @@ export type FileAttribute = {
     isReadOnly: boolean;
     isSymbolicLink: boolean;
     isSystem: boolean;
-    atime: number;
-    ctime: number;
-    mtime: number;
+    atimeMs: number;
+    ctimeMs: number;
+    mtimeMs: number;
+    birthtimeMs: number;
     size: number;
 };
 
