@@ -243,7 +243,7 @@ pub fn list_volumes(mut cx: FunctionContext) -> JsResult<JsArray> {
 
 pub fn get_file_attribute(mut cx: FunctionContext) -> JsResult<JsObject> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    match nonstd::fs::get_file_attribute(&file_path) {
+    match nonstd::fs::stat(&file_path) {
         Ok(att) => {
             let attrs = cx.empty_object();
 

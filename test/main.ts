@@ -62,6 +62,17 @@ const createWindow = () => {
     // console.log(y);
 };
 
+const getHandle = () => {
+    const hwndBuffer = win.getNativeWindowHandle();
+    let hwnd = 0;
+    if (os.endianness() == "LE") {
+        hwnd = hwndBuffer.readInt32LE();
+    } else {
+        hwnd = hwndBuffer.readInt32BE();
+    }
+    return hwnd;
+};
+
 const handleSetTitle = async (_e: any, s: string, d: string) => {
     console.log("from");
     try {
@@ -95,32 +106,9 @@ const progressCb = (progress: Progress) => {
 };
 
 const append = () => {
-    const directory = __dirname;
-
-    const allDirents = fs.readdirSync(directory, { withFileTypes: true });
-    const files = [];
-    allDirents
-        .filter((dirent, i) => {
-            try {
-                const x = fs2.getFileAttribute(path.join(directory, dirent.name));
-
-                if (i == 2) {
-                    const s = fs.statSync(path.join(directory, dirent.name));
-                    console.log(path.join(directory, dirent.name));
-                    console.log(s.atimeMs);
-                    console.log(x.atimeMs);
-                    console.log(s.mtimeMs);
-                    console.log(x.mtimeMs);
-                    console.log(s.size);
-                    console.log(x.size);
-                }
-                return !x.isSystem;
-            } catch (ex: any) {
-                console.log(path.join(directory, dirent.name));
-                return true;
-            }
-        })
-        .forEach((file) => files.push(file));
+    const hwnd = getHandle();
+    const text = "People’s text";
+    clipboard.writeText(hwnd, text);
 };
 
 const reload = async (_e: any, s: string[], d: string) => {
@@ -132,25 +120,13 @@ const reload = async (_e: any, s: string[], d: string) => {
 };
 
 const toggle = () => {
-    const hwndBuffer = win.getNativeWindowHandle();
-    let hwnd = 0;
-    if (os.endianness() == "LE") {
-        hwnd = hwndBuffer.readInt32LE();
-    } else {
-        hwnd = hwndBuffer.readInt32BE();
-    }
+    const hwnd = getHandle();
     clipboard.writeUris(hwnd, [path.join(__dirname, "..", "package.json"), path.join(__dirname, "..", "tsconfig.json")], "Copy");
 };
 
 const openprop = false;
 const open = () => {
-    const hwndBuffer = win.getNativeWindowHandle();
-    let hwnd = 0;
-    if (os.endianness() == "LE") {
-        hwnd = hwndBuffer.readInt32LE();
-    } else {
-        hwnd = hwndBuffer.readInt32BE();
-    }
+    const hwnd = getHandle();
 
     if (openprop) {
         shell.openFileProperty(hwnd, path.join(__dirname, "..", "package.json"));
@@ -161,13 +137,7 @@ const open = () => {
 
 const openWith = false;
 const openwith = () => {
-    const hwndBuffer = win.getNativeWindowHandle();
-    let hwnd = 0;
-    if (os.endianness() == "LE") {
-        hwnd = hwndBuffer.readInt32LE();
-    } else {
-        hwnd = hwndBuffer.readInt32BE();
-    }
+    const hwnd = getHandle();
 
     if (openWith) {
         shell.openPathWith(hwnd, path.join(__dirname, "..", "package.json"));
@@ -186,13 +156,7 @@ const content = () => {
 const draggable = () => {
     const f = __dirname;
     const a = [path.join(f, "main.ts"), path.join(f, "package.json"), path.join(f, "preload.js")];
-    const hwndBuffer = win.getNativeWindowHandle();
-    let hwnd = 0;
-    if (os.endianness() == "LE") {
-        hwnd = hwndBuffer.readInt32LE();
-    } else {
-        hwnd = hwndBuffer.readInt32BE();
-    }
+    const hwnd = getHandle();
     drag.startDrag(a, hwnd);
 };
 
