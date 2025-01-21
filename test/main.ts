@@ -105,10 +105,18 @@ const progressCb = (progress: Progress) => {
     }
 };
 
+let write = false;
 const append = () => {
+    write = !write;
     const hwnd = getHandle();
-    const text = "People’s text";
-    clipboard.writeText(hwnd, text);
+    if (write) {
+        const text = "People’s textあ";
+        clipboard.writeText(hwnd, text);
+    } else {
+        const result = clipboard.readText(hwnd);
+        console.log(`result:${result}`);
+        fs.writeFileSync(path.join(__dirname, "test.txt"), result, { encoding: "utf-8" });
+    }
 };
 
 const reload = async (_e: any, s: string[], d: string) => {
@@ -121,7 +129,7 @@ const reload = async (_e: any, s: string[], d: string) => {
 
 const toggle = () => {
     const hwnd = getHandle();
-    clipboard.writeUris(hwnd, [path.join(__dirname, "..", "package.json"), path.join(__dirname, "..", "tsconfig.json")], "Copy");
+    clipboard.writeUris(hwnd, [path.join(__dirname, "..", "pack’age.json"), path.join(__dirname, "..", "tsconfig.json")], "Copy");
 };
 
 const openprop = false;
