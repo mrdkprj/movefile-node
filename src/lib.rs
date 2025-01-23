@@ -364,10 +364,21 @@ pub fn open_path_with(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
-pub fn get_open_with(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+pub fn show_open_with_dialog(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    let _ = nonstd::shell::get_open_with(file_path);
+    let _ = nonstd::shell::show_open_with_dialog(file_path);
     Ok(cx.undefined())
+}
+
+pub fn get_open_with(mut cx: FunctionContext) -> JsResult<JsArray> {
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let result = nonstd::shell::get_open_with(file_path);
+    let arr = cx.empty_array();
+    let obj = cx.empty_object();
+    let a = cx.string(result[0].path.clone());
+    obj.set(&mut cx, "path", a)?;
+    arr.set(&mut cx, 0, obj)?;
+    Ok(arr)
 }
 
 pub fn show_item_in_folder(mut cx: FunctionContext) -> JsResult<JsUndefined> {
@@ -378,7 +389,7 @@ pub fn show_item_in_folder(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 pub fn get_mime_type(mut cx: FunctionContext) -> JsResult<JsString> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    let content_type = nonstd::fs::get_mime_type(file_path).unwrap_or_default();
+    let content_type = nonstd::fs::get_mime_type(file_path);
     Ok(cx.string(content_type))
 }
 
@@ -472,6 +483,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("get_mime_type", get_mime_type)?;
     cx.export_function("start_drag", start_drag)?;
     cx.export_function("get_open_with", get_open_with)?;
+    cx.export_function("show_open_with_dialog", show_open_with_dialog)?;
 
     Ok(())
 }

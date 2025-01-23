@@ -97,16 +97,16 @@ export class shell {
         return MoveFile.trash(file);
     };
 
-    static openPath = (windowHandle: number, filePath: string) => {
-        return MoveFile.open_path(windowHandle, filePath);
+    static openPath = (filePath: string) => {
+        return MoveFile.open_path(filePath);
     };
 
-    static openPathWith = (windowHandle: number, filePath: string) => {
-        return MoveFile.open_path_with(windowHandle, filePath);
+    static openPathWith = (filePath: string, appPath: string) => {
+        return MoveFile.open_path_with(filePath, appPath);
     };
 
-    static openFileProperty = (windowHandle: number, filePath: string) => {
-        return MoveFile.open_file_property(windowHandle, filePath);
+    static openFileProperty = (filePath: string) => {
+        return MoveFile.open_file_property(filePath);
     };
 
     static showItemInFolder = (filePath: string) => {
@@ -115,6 +115,10 @@ export class shell {
 
     static getOpenWith = (filePath: string): AppInfo[] => {
         return MoveFile.get_open_with(filePath);
+    };
+
+    static showOpenWithDialog = (filePath: string) => {
+        return MoveFile.show_open_with_dialog(filePath);
     };
 }
 

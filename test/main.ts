@@ -136,28 +136,25 @@ const reload = async (_e: any, _s: string[], _d: string) => {
     // } catch (ex: any) {
     //     dialog.showErrorBox("e", ex.message);
     // }
-    const x = shell.getOpenWith(path.join(__dirname, "package.json"));
+    // shell.showOpenWithDialog(path.join(__dirname, "package.json"));
+    let x = shell.getOpenWith(path.join(__dirname, "package.json"));
     console.log(x);
-    shell.openPathWith(0, path.join(__dirname, "package.json"));
+    shell.openPathWith(path.join(__dirname, "package.json"), x[0].path);
 };
 
 const openprop = false;
 const open = () => {
-    const hwnd = getHandle();
-
     if (openprop) {
-        shell.openFileProperty(hwnd, path.join(__dirname, "..", "package.json"));
+        shell.openFileProperty(path.join(__dirname, "..", "package.json"));
     } else {
-        shell.openPath(hwnd, path.join(__dirname, "..", "package.json"));
+        shell.openPath(path.join(__dirname, "..", "package.json"));
     }
 };
 
 const openWith = false;
 const openwith = () => {
-    const hwnd = getHandle();
-
     if (openWith) {
-        shell.openPathWith(hwnd, path.join(__dirname, "..", "package.json"));
+        shell.showOpenWithDialog(path.join(__dirname, "..", "package.json"));
     } else {
         shell.showItemInFolder(path.join(__dirname, "..", "package.json"));
     }

@@ -9,9 +9,9 @@ declare namespace MoveFile {
     function trash(file:string):void;
     function list_volumes():any[];
     function get_file_attribute(filePath:string):any;
-    function open_path(windowHandle:number, fullPath:string):void;
-    function open_path_with(windowHandle:number, fullPath:string):void;
-    function open_file_property(windowHandle:number, fullPath:string):void;
+    function open_path(fullPath:string):void;
+    function open_path_with(fullPath:string, appPath:string):void;
+    function open_file_property(fullPath:string):void;
     function show_item_in_folder(fullPath:string):void;
     function is_text_available():boolean;
     function read_text(windowHandle:number):string;
@@ -23,6 +23,7 @@ declare namespace MoveFile {
     function get_mime_type(filePath:string):string;
     function start_drag(paths:string[], windowHandle:number):void;
     function get_open_with(fullPath:string):any[];
+    function show_open_with_dialog(fullPath:string):void;
 }
 
 export = MoveFile;
