@@ -1,3 +1,4 @@
+use super::util::init;
 use crate::{Dirent, FileAttribute, Volume};
 use gio::{
     ffi::{g_file_copy, G_FILE_COPY_ALL_METADATA, G_FILE_COPY_OVERWRITE},
@@ -26,7 +27,8 @@ static CANCELLABLES: Lazy<Mutex<HashMap<u32, Cancellable>>> = Lazy::new(|| Mutex
 const ATTRIBUTES: &str = "filesystem::readonly,standard::is-hidden,standard::is-symlink,standard::name,standard::size,standard::type,time::*";
 
 pub fn list_volumes() -> Result<Vec<Volume>, String> {
-    let _ = gtk::init();
+    init();
+
     let mut volumes = Vec::new();
     let monitor = VolumeMonitor::get();
 

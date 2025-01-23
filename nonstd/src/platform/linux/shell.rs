@@ -1,14 +1,15 @@
-use std::path::Path;
-
 use gio::{glib::ToVariant, prelude::FileExt, Cancellable, DBusCallFlags, DBusConnectionFlags, File};
 use gtk::{prelude::WidgetExt, DialogFlags};
+use std::path::Path;
 
 pub fn open_file_property<P: AsRef<Path>>(_window_handle: isize, _file_path: P) -> Result<(), String> {
     Ok(())
 }
 
 pub fn open_path<P: AsRef<Path>>(_window_handle: isize, file_path: P) -> Result<(), String> {
-    gio::AppInfo::launch_default_for_uri(file_path.as_ref().to_str().unwrap(), gio::AppLaunchContext::NONE).map_err(|e| e.message().to_string())
+    let uri = format!("file://{}", file_path.as_ref().to_str().unwrap());
+    gio::AppInfo::launch_default_for_uri(&uri, gio::AppLaunchContext::NONE).unwrap();
+    Ok(())
 }
 
 pub fn open_path_with<P: AsRef<Path>>(_window_handle: isize, file_path: P) -> Result<(), String> {

@@ -119,17 +119,23 @@ const append = () => {
     }
 };
 
+const toggle = () => {
+    const hwnd = getHandle();
+    write = !write;
+    if (write) {
+        clipboard.writeUris(hwnd, [path.join(__dirname, "..", "package.json"), path.join(__dirname, "..", "tsconfig.json")], "Copy");
+    } else {
+        let x = clipboard.readUris(hwnd);
+        console.log(x);
+    }
+};
+
 const reload = async (_e: any, s: string[], d: string) => {
     try {
         sync ? await fs2.mvAll(s, d, progressCb) : await fs2.mvAll(s, d);
     } catch (ex: any) {
         dialog.showErrorBox("e", ex.message);
     }
-};
-
-const toggle = () => {
-    const hwnd = getHandle();
-    clipboard.writeUris(hwnd, [path.join(__dirname, "..", "pack’age.json"), path.join(__dirname, "..", "tsconfig.json")], "Copy");
 };
 
 const openprop = false;
