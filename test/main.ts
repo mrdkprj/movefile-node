@@ -130,12 +130,15 @@ const toggle = () => {
     }
 };
 
-const reload = async (_e: any, s: string[], d: string) => {
-    try {
-        sync ? await fs2.mvAll(s, d, progressCb) : await fs2.mvAll(s, d);
-    } catch (ex: any) {
-        dialog.showErrorBox("e", ex.message);
-    }
+const reload = async (_e: any, _s: string[], _d: string) => {
+    // try {
+    //     sync ? await fs2.mvAll(s, d, progressCb) : await fs2.mvAll(s, d);
+    // } catch (ex: any) {
+    //     dialog.showErrorBox("e", ex.message);
+    // }
+    const x = shell.getOpenWith(path.join(__dirname, "package.json"));
+    console.log(x);
+    shell.openPathWith(0, path.join(__dirname, "package.json"));
 };
 
 const openprop = false;

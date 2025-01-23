@@ -40,6 +40,12 @@ export type Dirent = {
     mimeType: string;
 };
 
+export type AppInfo = {
+    path: string;
+    name: string;
+    icon: string;
+};
+
 export class fs {
     static mv = async (sourceFile: string, destFile: string, callback?: ProgressCallback, id?: number) => {
         if (callback) {
@@ -105,6 +111,10 @@ export class shell {
 
     static showItemInFolder = (filePath: string) => {
         return MoveFile.show_item_in_folder(filePath);
+    };
+
+    static getOpenWith = (filePath: string): AppInfo[] => {
+        return MoveFile.get_open_with(filePath);
     };
 }
 

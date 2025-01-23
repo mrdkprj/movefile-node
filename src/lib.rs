@@ -346,23 +346,27 @@ pub fn trash(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 pub fn open_file_property(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_file_property(window_handle as isize, file_path);
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let _ = nonstd::shell::open_file_property(file_path);
     Ok(cx.undefined())
 }
 
 pub fn open_path(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_path(window_handle as isize, file_path);
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let _ = nonstd::shell::open_path(file_path);
     Ok(cx.undefined())
 }
 
 pub fn open_path_with(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    let file_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_path_with(window_handle as isize, file_path);
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let app_path = cx.argument::<JsString>(1)?.value(&mut cx);
+    let _ = nonstd::shell::open_path_with(file_path, app_path);
+    Ok(cx.undefined())
+}
+
+pub fn get_open_with(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let _ = nonstd::shell::get_open_with(file_path);
     Ok(cx.undefined())
 }
 
@@ -467,6 +471,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("readdir", readdir)?;
     cx.export_function("get_mime_type", get_mime_type)?;
     cx.export_function("start_drag", start_drag)?;
+    cx.export_function("get_open_with", get_open_with)?;
 
     Ok(())
 }

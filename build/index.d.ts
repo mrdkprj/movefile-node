@@ -22,6 +22,7 @@ declare namespace MoveFile {
     function readdir(directory:string, recursive:boolean, withMimeType:boolean):any[];
     function get_mime_type(filePath:string):string;
     function start_drag(paths:string[], windowHandle:number):void;
+    function get_open_with(fullPath:string):any[];
 }
 
 export = MoveFile;
