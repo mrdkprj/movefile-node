@@ -139,7 +139,7 @@ const reload = async (_e: any, _s: string[], _d: string) => {
     // shell.showOpenWithDialog(path.join(__dirname, "package.json"));
     let x = shell.getOpenWith(path.join(__dirname, "package.json"));
     console.log(x);
-    shell.openPathWith(path.join(__dirname, "package.json"), x[0].path);
+    // shell.openPathWith(path.join(__dirname, "package.json"), x[0].path);
 };
 
 const openprop = false;
