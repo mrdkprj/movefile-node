@@ -205,7 +205,7 @@ fn try_readdir<P: AsRef<Path>>(handle: HANDLE, parent: P, entries: &mut Vec<Dire
         full_path.push(name.clone());
 
         let mime_type = if with_mime_type {
-            get_mime_type(&name)?
+            get_mime_type(&name)
         } else {
             String::new()
         };
