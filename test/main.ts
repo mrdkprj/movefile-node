@@ -25,27 +25,27 @@ const createWindow = () => {
     // const vols = fs2.listVolumes();
     // console.log(vols);
 
-    let s = new Date().getTime();
-    const x = fs.readdirSync(__dirname, { withFileTypes: true, recursive: true });
+    // let s = new Date().getTime();
+    // const x = fs.readdirSync(__dirname, { withFileTypes: true, recursive: true });
     // x.forEach((a) => {
     //     const y = fs2.getFileAttribute(path.join(a.parentPath, a.name));
     //     if (y.isSystem || y.isHidden || y.isSymbolicLink) {
     //         console.log(a.name);
     //     }
     // });
-    console.log(x.length);
-    console.log(new Date().getTime() - s);
+    // console.log(x.length);
+    // console.log(new Date().getTime() - s);
 
-    s = new Date().getTime();
-    const entries = fs2.readdir(__dirname, true, true);
+    // s = new Date().getTime();
+    // const entries = fs2.readdir(__dirname, true, true);
 
-    console.log(entries.length);
-    console.log(new Date().getTime() - s);
+    // console.log(entries.length);
+    // console.log(new Date().getTime() - s);
 
-    const stat = fs.statSync(entries[0].fullPath);
-    console.log(stat);
-    const a = fs2.getFileAttribute(entries[0].fullPath);
-    console.log(a);
+    // const stat = fs.statSync(entries[0].fullPath);
+    // console.log(stat);
+    // const a = fs2.getFileAttribute(entries[0].fullPath);
+    // console.log(a);
     // entries.forEach((entry) => console.log(entry.fullPath));
 
     // const hwndBuffer = win.getNativeWindowHandle();
@@ -136,9 +136,8 @@ const reload = async (_e: any, _s: string[], _d: string) => {
     // } catch (ex: any) {
     //     dialog.showErrorBox("e", ex.message);
     // }
-    // shell.showOpenWithDialog(path.join(__dirname, "package.json"));
-    let x = shell.getOpenWith(path.join(__dirname, "package.json"));
-    console.log(x);
+    shell.showOpenWithDialog(path.join(__dirname, "package.json"));
+
     // shell.openPathWith(path.join(__dirname, "package.json"), x[0].path);
 };
 
