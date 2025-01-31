@@ -136,7 +136,7 @@ const reload = async (_e: any, _s: string[], _d: string) => {
     // } catch (ex: any) {
     //     dialog.showErrorBox("e", ex.message);
     // }
-    shell.showOpenWithDialog(path.join(__dirname, "package.json"));
+    shell.getOpenWith(path.join(__dirname, "package.json"));
 
     // shell.openPathWith(path.join(__dirname, "package.json"), x[0].path);
 };

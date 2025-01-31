@@ -121,10 +121,7 @@ pub fn get_open_with<P: AsRef<Path>>(file_path: P) -> Vec<AppInfo> {
                     };
 
                     let rgba_icon = if icon.is_empty() && icon_location.is_ok() {
-                        match to_rgba_bitmap(icon_path, index) {
-                            Ok(rgba_icon) => rgba_icon,
-                            Err(_) => RgbaIcon::default(),
-                        }
+                        to_rgba_bitmap(icon_path, index).unwrap_or_default()
                     } else {
                         RgbaIcon::default()
                     };
@@ -166,7 +163,7 @@ fn extract_app_user_model_id(input: PWSTR) -> Option<String> {
 
 fn is_uwp(icon_location: PWSTR) -> bool {
     let icon_path = decode_wide(unsafe { icon_location.as_wide() });
-    return icon_path.starts_with("@");
+    icon_path.starts_with("@")
 }
 
 /* Get actual icon path if path starts with "@" */
@@ -218,7 +215,7 @@ fn to_rgba_bitmap(icon_path: PWSTR, icon_index: i32) -> Result<RgbaIcon, String>
 
         // Retrieve the RGBA pixel data
         unsafe { SelectObject(hdc, icon_info.hbmColor) };
-        if unsafe { GetDIBits(hdc, icon_info.hbmColor, 0, height as u32, Some(pixel_data.as_mut_ptr() as *mut _), &mut bitmap_info, DIB_RGB_COLORS) } == 0 {
+        if unsafe { GetDIBits(hdc, icon_info.hbmColor, 0, height, Some(pixel_data.as_mut_ptr() as *mut _), &mut bitmap_info, DIB_RGB_COLORS) } == 0 {
             let _ = unsafe { DeleteDC(hdc) };
             return Err("Failed to retrieve pixel data".to_string());
         }
