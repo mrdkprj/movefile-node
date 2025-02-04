@@ -4,7 +4,7 @@ use neon::{
     result::{JsResult, NeonResult},
     types::{JsArray, JsBoolean, JsFunction, JsNumber, JsObject, JsPromise, JsString, JsUndefined},
 };
-use nonstd::Operation;
+use nonstd::{shell::ThumbButton, Operation};
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
@@ -453,6 +453,23 @@ fn start_drag(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
+fn register(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
+    nonstd::shell::set_thumbar_buttons(
+        window_handle as _,
+        &[ThumbButton {
+            id: 100,
+            tool_tip: Some("Ok".to_string()),
+            icon: std::path::PathBuf::from(""),
+        }],
+        &mut |id| {
+            println!("{:?}", id);
+        },
+    );
+
+    Ok(cx.undefined())
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv", mv)?;
@@ -478,6 +495,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("start_drag", start_drag)?;
     cx.export_function("get_open_with", get_open_with)?;
     cx.export_function("show_open_with_dialog", show_open_with_dialog)?;
+    cx.export_function("register", register)?;
 
     Ok(())
 }

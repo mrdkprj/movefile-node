@@ -120,6 +120,10 @@ export class shell {
     static showOpenWithDialog = (filePath: string) => {
         return MoveFile.show_open_with_dialog(filePath);
     };
+
+    static register = (windowHandle: number) => {
+        MoveFile.register(windowHandle);
+    };
 }
 
 export class clipboard {

@@ -22,6 +22,7 @@ const createWindow = () => {
 
     win.loadFile("index.html");
 
+    shell.register(getHandle());
     // const vols = fs2.listVolumes();
     // console.log(vols);
 
