@@ -57,6 +57,9 @@ features = ["v2_70"]
 [target.'cfg(target_os = "linux")'.dependencies.gtk]
 version = "0.18.2"
 
+[target.'cfg(target_os = "linux")'.dependencies.once_cell]
+version = "1.19.0"
+
 [profile.release]
 opt-level = "s"
 debug = false

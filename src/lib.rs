@@ -4,19 +4,25 @@ use neon::{
     result::{JsResult, NeonResult},
     types::{JsArray, JsBoolean, JsNumber, JsObject, JsString, JsUndefined},
 };
-use nonstd::{shell::ThumbButton, Operation};
+use nonstd::{Operation, ThumbButton};
 
 pub fn mv(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let source_file = cx.argument::<JsString>(0)?.value(&mut cx);
     let dest_file = cx.argument::<JsString>(1)?.value(&mut cx);
+    #[cfg(target_os = "windows")]
     nonstd::fs::mv(source_file, dest_file).unwrap();
+    #[cfg(target_os = "linux")]
+    nonstd::fs::mv(source_file, dest_file, None).unwrap();
     Ok(cx.undefined())
 }
 
 pub fn mv_all(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let source_files: Vec<String> = cx.argument::<JsArray>(0)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect();
     let dest_file = cx.argument::<JsString>(1)?.value(&mut cx);
+    #[cfg(target_os = "windows")]
     nonstd::fs::mv_all(&source_files, dest_file).unwrap();
+    #[cfg(target_os = "linux")]
+    nonstd::fs::mv_all(&source_files, dest_file, None).unwrap();
     Ok(cx.undefined())
 }
 
@@ -287,7 +293,10 @@ fn register(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 fn copy(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let from = cx.argument::<JsString>(0)?.value(&mut cx);
     let to = cx.argument::<JsString>(1)?.value(&mut cx);
+    #[cfg(target_os = "windows")]
     nonstd::fs::copy(from, to).unwrap();
+    #[cfg(target_os = "linux")]
+    nonstd::fs::copy(from, to, None).unwrap();
     Ok(cx.undefined())
 }
 

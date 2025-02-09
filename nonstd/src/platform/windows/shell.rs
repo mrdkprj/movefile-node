@@ -293,12 +293,6 @@ pub fn trash<P: AsRef<Path>>(file_path: P) -> Result<(), String> {
     unsafe { op.PerformOperations().map_err(|e| e.message()) }
 }
 
-pub struct ThumbButton {
-    pub id: String,
-    pub tool_tip: Option<String>,
-    pub icon: PathBuf,
-}
-
 struct InnerThumbButtons {
     callback: Box<dyn Fn(String)>,
     id_map: HashMap<u32, String>,

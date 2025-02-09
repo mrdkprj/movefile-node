@@ -484,6 +484,7 @@ dependencies = [
  "gio",
  "gtk",
  "mime_guess",
+ "once_cell",
  "serde",
  "windows",
  "windows-core",
