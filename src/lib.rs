@@ -2,221 +2,22 @@ use neon::{
     object::Object,
     prelude::{Context, FunctionContext, ModuleContext},
     result::{JsResult, NeonResult},
-    types::{JsArray, JsBoolean, JsFunction, JsNumber, JsObject, JsPromise, JsString, JsUndefined},
+    types::{JsArray, JsBoolean, JsNumber, JsObject, JsString, JsUndefined},
 };
 use nonstd::{shell::ThumbButton, Operation};
-use once_cell::sync::Lazy;
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Mutex,
-    },
-};
 
-static UUID: AtomicU32 = AtomicU32::new(0);
-static CALLBACKS: Lazy<Mutex<HashMap<u32, neon::handle::Root<JsFunction>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-
-pub fn reserve_cancellable(mut cx: FunctionContext) -> JsResult<JsNumber> {
-    Ok(cx.number(nonstd::fs::reserve_cancellable()))
-}
-
-pub fn mv(cx: FunctionContext) -> JsResult<JsPromise> {
-    if cx.len() > 2 {
-        listen_mv(cx, false)
-    } else {
-        spawn_mv(cx, false)
-    }
-}
-
-pub fn mv_all(cx: FunctionContext) -> JsResult<JsPromise> {
-    if cx.len() > 2 {
-        listen_mv(cx, true)
-    } else {
-        spawn_mv(cx, true)
-    }
-}
-
-fn extract_optional_id(cx: &mut FunctionContext, index: usize) -> Option<u32> {
-    let opt_id = cx.argument_opt(index);
-
-    if let Some(id_value) = opt_id {
-        if id_value.is_a::<JsNumber, _>(cx) {
-            let id = id_value.downcast::<JsNumber, _>(cx).unwrap().value(cx) as u32;
-            Some(id)
-        } else {
-            None
-        }
-    } else {
-        None
-    }
-}
-
-fn spawn_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
-    let source_files: Vec<String> = if bulk {
-        cx.argument::<JsArray>(0)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect()
-    } else {
-        vec![cx.argument::<JsString>(0)?.value(&mut cx)]
-    };
-    let dest_file = cx.argument::<JsString>(1)?.value(&mut cx);
-    let id = extract_optional_id(&mut cx, 2);
-
-    let (deferred, promise) = cx.promise();
-    let channel = cx.channel();
-
-    if bulk {
-        async_std::task::spawn(async move {
-            let result = nonstd::fs::mv_all(source_files, dest_file, None, id);
-            deferred.settle_with(&channel, |mut cx| match result {
-                Ok(_) => Ok(cx.undefined()),
-                Err(e) => cx.throw_error(e),
-            });
-        });
-    } else {
-        async_std::task::spawn(async move {
-            let result = nonstd::fs::mv(source_files.first().unwrap(), dest_file, None, id);
-            deferred.settle_with(&channel, |mut cx| match result {
-                Ok(_) => Ok(cx.undefined()),
-                Err(e) => cx.throw_error(e),
-            });
-        });
-    }
-
-    Ok(promise)
-}
-
-fn listen_mv(mut cx: FunctionContext, bulk: bool) -> JsResult<JsPromise> {
-    let source_files: Vec<String> = if bulk {
-        cx.argument::<neon::types::JsArray>(0)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect()
-    } else {
-        vec![cx.argument::<JsString>(0)?.value(&mut cx)]
-    };
-    let dest_file = cx.argument::<JsString>(1)?.value(&mut cx);
-    let callback = cx.argument::<JsFunction>(2)?.root(&mut cx);
-    let id = extract_optional_id(&mut cx, 3);
-
-    let (deferred, promise) = cx.promise();
-    let channel = cx.channel();
-
-    let callback_id = UUID.fetch_add(1, Ordering::Relaxed);
-    let mut callbacks = CALLBACKS.lock().unwrap();
-    callbacks.insert(callback_id, callback);
-
-    if bulk {
-        async_std::task::spawn(async move {
-            let result = nonstd::fs::mv_all(
-                source_files,
-                dest_file,
-                Some(&mut |a, b| {
-                    channel.clone().send(move |mut cx| {
-                        let obj = cx.empty_object();
-                        let total = if cfg!(windows) {
-                            cx.number(a as f64)
-                        } else {
-                            cx.number(b as f64)
-                        };
-                        let transferred = if cfg!(windows) {
-                            cx.number(b as f64)
-                        } else {
-                            cx.number(a as f64)
-                        };
-                        obj.set(&mut cx, "totalFileSize", total).unwrap();
-                        obj.set(&mut cx, "transferred", transferred).unwrap();
-                        let this = cx.undefined();
-                        let args = vec![obj.upcast()];
-                        if let Ok(mut callbacks) = CALLBACKS.try_lock() {
-                            if let Some(callback) = callbacks.get(&callback_id) {
-                                callback.clone(&mut cx).into_inner(&mut cx).call(&mut cx, this, args).unwrap();
-                                if a == b {
-                                    let _ = callbacks.remove(&callback_id);
-                                }
-                            }
-                        }
-
-                        Ok(())
-                    });
-                }),
-                id,
-            );
-
-            deferred.settle_with(&channel, |mut cx| match result {
-                Ok(_) => Ok(cx.undefined()),
-                Err(e) => cx.throw_error(e),
-            });
-        });
-    } else {
-        async_std::task::spawn(async move {
-            let result = nonstd::fs::mv(
-                source_files.first().unwrap(),
-                dest_file,
-                Some(&mut |a, b| {
-                    channel.clone().send(move |mut cx| {
-                        let obj = cx.empty_object();
-                        let total = if cfg!(windows) {
-                            cx.number(a as f64)
-                        } else {
-                            cx.number(b as f64)
-                        };
-                        let transferred = if cfg!(windows) {
-                            cx.number(b as f64)
-                        } else {
-                            cx.number(a as f64)
-                        };
-                        obj.set(&mut cx, "totalFileSize", total).unwrap();
-                        obj.set(&mut cx, "transferred", transferred).unwrap();
-                        let this = cx.undefined();
-                        let args = vec![obj.upcast()];
-                        if let Ok(mut callbacks) = CALLBACKS.try_lock() {
-                            if let Some(callback) = callbacks.get(&callback_id) {
-                                callback.clone(&mut cx).into_inner(&mut cx).call(&mut cx, this, args).unwrap();
-                                if a == b {
-                                    let _ = callbacks.remove(&callback_id);
-                                }
-                            }
-                        }
-
-                        Ok(())
-                    });
-                }),
-                id,
-            );
-
-            deferred.settle_with(&channel, |mut cx| match result {
-                Ok(_) => Ok(cx.undefined()),
-                Err(e) => cx.throw_error(e),
-            });
-        });
-    }
-
-    Ok(promise)
-}
-
-pub fn mv_sync(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+pub fn mv(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let source_file = cx.argument::<JsString>(0)?.value(&mut cx);
     let dest_file = cx.argument::<JsString>(1)?.value(&mut cx);
-
-    let _ = nonstd::fs::mv(source_file, dest_file, None, None);
-
+    nonstd::fs::mv(source_file, dest_file).unwrap();
     Ok(cx.undefined())
 }
 
-pub fn cancel(mut cx: FunctionContext) -> JsResult<JsBoolean> {
-    let id = cx.argument::<JsNumber>(0)?.value(&mut cx) as i32;
-
-    if id < 0 {
-        panic!("Invalid Id");
-    }
-
-    let id = id as u32;
-    let result = nonstd::fs::cancel(id);
-
-    if let Ok(mut callbacks) = CALLBACKS.try_lock() {
-        if callbacks.get(&id).is_some() {
-            let _ = callbacks.remove(&id);
-        }
-    }
-
-    Ok(cx.boolean(result))
+pub fn mv_all(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let source_files: Vec<String> = cx.argument::<JsArray>(0)?.to_vec(&mut cx)?.iter().map(|a| a.downcast::<JsString, _>(&mut cx).unwrap().value(&mut cx)).collect();
+    let dest_file = cx.argument::<JsString>(1)?.value(&mut cx);
+    nonstd::fs::mv_all(&source_files, dest_file).unwrap();
+    Ok(cx.undefined())
 }
 
 pub fn list_volumes(mut cx: FunctionContext) -> JsResult<JsArray> {
@@ -360,7 +161,7 @@ pub fn open_path(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 pub fn open_path_with(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
     let app_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_path_with(file_path, app_path);
+    let _ = nonstd::shell::open_with(file_path, app_path);
     Ok(cx.undefined())
 }
 
@@ -457,25 +258,42 @@ fn register(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let window_handle = cx.argument::<JsNumber>(0)?.value(&mut cx);
     nonstd::shell::set_thumbar_buttons(
         window_handle as _,
-        &[ThumbButton {
-            id: 100,
-            tool_tip: Some("Ok".to_string()),
-            icon: std::path::PathBuf::from(""),
-        }],
-        &mut |id| {
+        &[
+            ThumbButton {
+                id: String::from("1"),
+                tool_tip: Some("Ok".to_string()),
+                icon: std::path::PathBuf::from(r#"play.png"#),
+            },
+            ThumbButton {
+                id: String::from("2"),
+                tool_tip: Some("Ok".to_string()),
+                icon: std::path::PathBuf::from(r#"play.png"#),
+            },
+            ThumbButton {
+                id: String::from("3"),
+                tool_tip: Some("Ok".to_string()),
+                icon: std::path::PathBuf::from(r#"play.png"#),
+            },
+        ],
+        |id| {
             println!("{:?}", id);
         },
-    );
+    )
+    .unwrap();
 
+    Ok(cx.undefined())
+}
+
+fn copy(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let from = cx.argument::<JsString>(0)?.value(&mut cx);
+    let to = cx.argument::<JsString>(1)?.value(&mut cx);
+    nonstd::fs::copy(from, to).unwrap();
     Ok(cx.undefined())
 }
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv", mv)?;
-    cx.export_function("mv_sync", mv_sync)?;
-    cx.export_function("cancel", cancel)?;
-    cx.export_function("reserve_cancellable", reserve_cancellable)?;
     cx.export_function("trash", trash)?;
     cx.export_function("mv_all", mv_all)?;
     cx.export_function("list_volumes", list_volumes)?;
@@ -496,6 +314,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("get_open_with", get_open_with)?;
     cx.export_function("show_open_with_dialog", show_open_with_dialog)?;
     cx.export_function("register", register)?;
+    cx.export_function("copy", copy)?;
 
     Ok(())
 }

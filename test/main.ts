@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 import os from "os";
 import path from "path";
 import fs from "fs";
-import { fs as fs2, clipboard, Progress, shell, drag } from "../lib/index";
+import { fs as fs2, clipboard, shell, drag } from "../lib/index";
 
 let sync = false;
 let win: BrowserWindow;
@@ -22,7 +22,7 @@ const createWindow = () => {
 
     win.loadFile("index.html");
 
-    shell.register(getHandle());
+    // shell.register(getHandle());
     // const vols = fs2.listVolumes();
     // console.log(vols);
 
@@ -74,35 +74,26 @@ const getHandle = () => {
     return hwnd;
 };
 
+let move = false;
 const handleSetTitle = async (_e: any, s: string, d: string) => {
     console.log("from");
-    try {
-        if (fs.existsSync(s)) {
-            console.log(s);
-            sync ? await fs2.mv(s, d, progressCb) : await fs2.mv(s, d);
-        } else {
-            console.log(d);
-            sync ? await fs2.mv(d, s, progressCb) : await fs2.mv(d, s);
+    if (move) {
+        try {
+            if (fs.existsSync(s)) {
+                console.log(s);
+                sync ? await fs2.mv(s, d) : await fs2.mv(s, d);
+            } else {
+                console.log(d);
+                sync ? await fs2.mv(d, s) : await fs2.mv(d, s);
+            }
+        } catch (ex: any) {
+            console.log("error");
+            console.log(ex);
+
+            dialog.showErrorBox("e", ex.message);
         }
-    } catch (ex: any) {
-        console.log("error");
-        console.log(ex);
-
-        dialog.showErrorBox("e", ex.message);
-    }
-    // cancel(id);
-};
-let count = 0;
-const progressCb = (progress: Progress) => {
-    count++;
-
-    // if (count > 3) {
-    //     cancel(id);
-    // }
-    const current = (progress.transferred / progress.totalFileSize) * 100;
-    console.log(progress);
-    if (win) {
-        win.webContents.send("progress", { current });
+    } else {
+        fs2.copy(path.join(__dirname, "from"), path.join(__dirname, "to"));
     }
 };
 
@@ -137,9 +128,9 @@ const reload = async (_e: any, _s: string[], _d: string) => {
     // } catch (ex: any) {
     //     dialog.showErrorBox("e", ex.message);
     // }
-    shell.getOpenWith(path.join(__dirname, "package.json"));
+    // shell.getOpenWith(path.join(__dirname, "package.json"));
 
-    // shell.openPathWith(path.join(__dirname, "package.json"), x[0].path);
+    shell.openPathWith("-d " + __dirname, "wt.exe");
 };
 
 const openprop = false;

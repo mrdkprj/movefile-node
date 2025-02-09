@@ -1,10 +1,5 @@
 import * as MoveFile from "../build/index";
 
-export type Progress = {
-    totalFileSize: number;
-    transferred: number;
-};
-export type ProgressCallback = (progress: Progress) => void;
 export type Volume = {
     mountPoint: string;
     volumeLabel: string;
@@ -47,32 +42,12 @@ export type AppInfo = {
 };
 
 export class fs {
-    static mv = async (sourceFile: string, destFile: string, callback?: ProgressCallback, id?: number) => {
-        if (callback) {
-            return await MoveFile.mv(sourceFile, destFile, callback, id);
-        } else {
-            return await MoveFile.mv(sourceFile, destFile);
-        }
+    static mv = async (from: string, to: string) => {
+        return MoveFile.mv(from, to);
     };
 
-    static mvAll = async (sourceFiles: string[], destDir: string, callback?: ProgressCallback, id?: number) => {
-        if (callback) {
-            return await MoveFile.mv_all(sourceFiles, destDir, callback, id);
-        } else {
-            return await MoveFile.mv_all(sourceFiles, destDir);
-        }
-    };
-
-    static mvSync = (sourceFile: string, destFile: string): number => {
-        return MoveFile.mv_sync(sourceFile, destFile);
-    };
-
-    static cancel = (id: number): boolean => {
-        return MoveFile.cancel(id);
-    };
-
-    static reserveCancellable = (): number => {
-        return MoveFile.reserve_cancellable();
+    static mvAll = async (from: string[], to: string) => {
+        return MoveFile.mv_all(from, to);
     };
 
     static listVolumes = (): Volume[] => {
@@ -89,6 +64,14 @@ export class fs {
 
     static getMimeType = (filePath: string): string => {
         return MoveFile.get_mime_type(filePath);
+    };
+
+    static copy = (from: string, to: string) => {
+        return MoveFile.copy(from, to);
+    };
+
+    static copyAll = (from: string[], to: string) => {
+        return MoveFile.copy_all(from, to);
     };
 }
 

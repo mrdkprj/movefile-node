@@ -18,12 +18,10 @@ window.onload = () => {
     //         }
     //     }
     // })
-
-
     document.getElementById("move").addEventListener("click", () => {
-            window.electronAPI.setTitle("","");
+        window.electronAPI.setTitle();
+    });
 
-    })
 
     document.getElementById("append").addEventListener("click", () => {
 
