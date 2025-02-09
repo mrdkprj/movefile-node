@@ -1,5 +1,5 @@
 use super::util::{decode_wide, encode_wide, prefixed, ComGuard};
-use crate::{AppInfo, RgbaIcon};
+use crate::{AppInfo, RgbaIcon, ThumbButton};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
