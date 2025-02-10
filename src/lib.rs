@@ -148,7 +148,7 @@ pub fn write_uris(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 pub fn trash(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    let _ = nonstd::shell::trash(file_path);
+    let _ = nonstd::fs::trash(file_path);
     Ok(cx.undefined())
 }
 
