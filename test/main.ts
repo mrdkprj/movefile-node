@@ -130,7 +130,8 @@ const reload = async (_e: any, _s: string[], _d: string) => {
     // }
     // shell.getOpenWith(path.join(__dirname, "package.json"));
 
-    shell.openPathWith("-d " + __dirname, "wt.exe");
+    console.log(__dirname);
+    shell.openPathWith(__dirname, "powershell.exe");
 };
 
 const openprop = false;

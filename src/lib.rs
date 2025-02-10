@@ -167,7 +167,7 @@ pub fn open_path(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 pub fn open_path_with(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
     let app_path = cx.argument::<JsString>(1)?.value(&mut cx);
-    let _ = nonstd::shell::open_with(file_path, app_path);
+    let _ = nonstd::shell::open_path_with(file_path, app_path);
     Ok(cx.undefined())
 }
 

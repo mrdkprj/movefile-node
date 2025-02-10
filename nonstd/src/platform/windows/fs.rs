@@ -237,7 +237,17 @@ pub fn mv<P1: AsRef<Path>, P2: AsRef<Path>>(from: P1, to: P2) -> Result<(), Stri
 
     let op: IFileOperation = unsafe { CoCreateInstance(&FileOperation, None, CLSCTX_ALL).map_err(|e| e.message()) }?;
     unsafe { op.MoveItem(&from_item, &to_item, None, None).map_err(|e| e.message()) }?;
-    unsafe { op.PerformOperations().map_err(|e| e.message()) }
+    let result = unsafe { op.PerformOperations() };
+
+    if result.is_err() {
+        if unsafe { op.GetAnyOperationsAborted().map_err(|e| e.message()) }?.as_bool() {
+            return Ok(());
+        } else {
+            return result.map_err(|e| e.message());
+        }
+    }
+
+    Ok(())
 }
 
 pub fn mv_all<P1: AsRef<Path>, P2: AsRef<Path>>(from: &[P1], to: P2) -> Result<(), String> {
@@ -260,7 +270,17 @@ pub fn mv_all<P1: AsRef<Path>, P2: AsRef<Path>>(from: &[P1], to: P2) -> Result<(
 
     let op: IFileOperation = unsafe { CoCreateInstance(&FileOperation, None, CLSCTX_ALL).map_err(|e| e.message()) }?;
     unsafe { op.MoveItems(&from_item_array, &to_item).map_err(|e| e.message()) }?;
-    unsafe { op.PerformOperations().map_err(|e| e.message()) }
+    let result = unsafe { op.PerformOperations() };
+
+    if result.is_err() {
+        if unsafe { op.GetAnyOperationsAborted().map_err(|e| e.message()) }?.as_bool() {
+            return Ok(());
+        } else {
+            return result.map_err(|e| e.message());
+        }
+    }
+
+    Ok(())
 }
 
 pub fn copy<P1: AsRef<Path>, P2: AsRef<Path>>(from: P1, to: P2) -> Result<(), String> {
@@ -273,7 +293,17 @@ pub fn copy<P1: AsRef<Path>, P2: AsRef<Path>>(from: P1, to: P2) -> Result<(), St
 
     let op: IFileOperation = unsafe { CoCreateInstance(&FileOperation, None, CLSCTX_ALL).map_err(|e| e.message()) }?;
     unsafe { op.CopyItem(&from_item, &to_item, None, None).map_err(|e| e.message()) }?;
-    unsafe { op.PerformOperations().map_err(|e| e.message()) }
+    let result = unsafe { op.PerformOperations() };
+
+    if result.is_err() {
+        if unsafe { op.GetAnyOperationsAborted().map_err(|e| e.message()) }?.as_bool() {
+            return Ok(());
+        } else {
+            return result.map_err(|e| e.message());
+        }
+    }
+
+    Ok(())
 }
 
 pub fn copy_all<P1: AsRef<Path>, P2: AsRef<Path>>(from: &[P1], to: P2) -> Result<(), String> {
@@ -296,5 +326,15 @@ pub fn copy_all<P1: AsRef<Path>, P2: AsRef<Path>>(from: &[P1], to: P2) -> Result
 
     let op: IFileOperation = unsafe { CoCreateInstance(&FileOperation, None, CLSCTX_ALL).map_err(|e| e.message()) }?;
     unsafe { op.CopyItems(&from_item_array, &to_item).map_err(|e| e.message()) }?;
-    unsafe { op.PerformOperations().map_err(|e| e.message()) }
+    let result = unsafe { op.PerformOperations() };
+
+    if result.is_err() {
+        if unsafe { op.GetAnyOperationsAborted().map_err(|e| e.message()) }?.as_bool() {
+            return Ok(());
+        } else {
+            return result.map_err(|e| e.message());
+        }
+    }
+
+    Ok(())
 }
