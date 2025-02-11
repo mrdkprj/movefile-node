@@ -2,7 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme } from "electron";
 import os from "os";
 import path from "path";
 import fs from "fs";
-import { fs as fs2, clipboard, shell, drag } from "../lib/index";
+import { fs as fs2, clipboard, shell, drag, dialog as dialog2 } from "../lib/index";
 
 let sync = false;
 let win: BrowserWindow;
@@ -153,10 +153,7 @@ const openwith = () => {
 };
 
 const content = () => {
-    ["a.mp4", "a.json", "a.js", "a.ts", "a.mov"].forEach((e) => {
-        const type = fs2.getMimeType(e);
-        console.log(type);
-    });
+    dialog2.message();
 };
 
 const draggable = () => {

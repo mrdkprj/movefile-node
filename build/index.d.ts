@@ -22,6 +22,7 @@ declare namespace MoveFile {
     function get_open_with(fullPath:string):any[];
     function show_open_with_dialog(fullPath:string):void;
     function register(windowHandle:number):void;
+    function message():void;
 }
 
 export = MoveFile;

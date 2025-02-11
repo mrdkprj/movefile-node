@@ -140,3 +140,9 @@ export class drag {
         return MoveFile.start_drag(paths, windowHandle ?? 0);
     };
 }
+
+export class dialog {
+    static message = () => {
+        return MoveFile.message();
+    };
+}

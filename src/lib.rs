@@ -13,6 +13,7 @@ pub fn mv(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     nonstd::fs::mv(source_file, dest_file).unwrap();
     #[cfg(target_os = "linux")]
     nonstd::fs::mv(source_file, dest_file, None).unwrap();
+
     Ok(cx.undefined())
 }
 
@@ -300,6 +301,40 @@ fn copy(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
+const MSG: bool = false;
+
+fn message(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    if MSG {
+        let options = nonstd::dialog::MessageDialogOptions {
+            title: Some("test".to_string()),
+            kind: Some(nonstd::dialog::MessageDialogKind::Error),
+            buttons: vec!["This".to_string(), "No".to_string()],
+            message: "this is the message".to_string(),
+            cancel_id: None,
+        };
+
+        async_std::task::spawn(async move {
+            let result = nonstd::dialog::message(options).await;
+
+            println!("{:?}", result);
+        });
+    } else {
+        let options = nonstd::dialog::SaveDialogOptions {
+            title: Some("test".to_string()),
+            default_path: Some(r#"C:\Download\abc"#.to_string()),
+            filters: None, //Some(vec![nonstd::dialog::FileFilter::new("Video", &["mp4", "mp3"])]),
+        };
+
+        async_std::task::spawn(async move {
+            let result = nonstd::dialog::save(options).await;
+
+            println!("{:?}", result);
+        });
+    }
+
+    Ok(cx.undefined())
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("mv", mv)?;
@@ -324,6 +359,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("show_open_with_dialog", show_open_with_dialog)?;
     cx.export_function("register", register)?;
     cx.export_function("copy", copy)?;
+    cx.export_function("message", message)?;
 
     Ok(())
 }
