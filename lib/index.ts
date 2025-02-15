@@ -107,6 +107,10 @@ export class shell {
     static register = (windowHandle: number) => {
         MoveFile.register(windowHandle);
     };
+
+    static sidecar = () => {
+        return MoveFile.sidecar();
+    };
 }
 
 export class clipboard {
