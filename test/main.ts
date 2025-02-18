@@ -129,10 +129,7 @@ const reload = async (_e: any, _s: string[], _d: string) => {
     //     dialog.showErrorBox("e", ex.message);
     // }
     // shell.getOpenWith(path.join(__dirname, "package.json"));
-
-    shell.openPathWith("wt -d " + __dirname, "wt.exe");
-    // shell.openPathWith("-NonInteractive -NoProfile -NoLogo -Command wt.exe -d " + __dirname, "powershell");
-    // shell.openPathWith("wt.exe -d " + __dirname, "powershell");
+    shell.openFileProperty(path.join(__dirname, "index.html"));
 };
 
 const openprop = false;

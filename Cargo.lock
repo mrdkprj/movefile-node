@@ -758,7 +758,7 @@ dependencies = [
 name = "nonstd"
 version = "0.1.0"
 dependencies = [
- "gio",
+ "async-std",
  "gtk",
  "mime_guess",
  "once_cell",
