@@ -129,7 +129,8 @@ const reload = async (_e: any, _s: string[], _d: string) => {
     //     dialog.showErrorBox("e", ex.message);
     // }
     // shell.getOpenWith(path.join(__dirname, "package.json"));
-    shell.openFileProperty(path.join(__dirname, "index.html"));
+    // shell.openFileProperty(path.join(__dirname, "index.html"));
+    shell.register(0);
 };
 
 const openprop = false;

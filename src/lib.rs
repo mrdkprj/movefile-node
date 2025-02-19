@@ -4,7 +4,8 @@ use neon::{
     result::{JsResult, NeonResult},
     types::{JsArray, JsBoolean, JsNumber, JsObject, JsString, JsUndefined},
 };
-use nonstd::{Operation, ThumbButton};
+#[allow(unused_imports)]
+use nonstd::{shell, Operation, ThumbButton};
 
 pub fn mv(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let source_file = cx.argument::<JsString>(0)?.value(&mut cx);
